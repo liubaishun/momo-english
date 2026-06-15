@@ -389,6 +389,34 @@
         .dark-dialog .setting-label { font-size: 0.95rem; color: var(--text-main); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         .dark-dialog .setting-value { color: var(--accent-color); font-weight: bold; font-family: monospace; font-size: 1.1rem; }
         .dark-dialog .setting-desc { font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 6px; line-height: 1.4; }
+
+
+
+
+        /* 表格整体美化 */
+.word-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px; /* 给行与行之间增加间距，避免压抑感 */
+}
+
+/* 单元格统一内边距 */
+.word-table td {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03); /* 给行加一点淡淡的背景 */
+}
+
+/* 单词列：加粗，设置固定比例 */
+.col-word { width: 25%; font-weight: 600; color: #e0e0e0; font-size: 1.1rem; }
+
+/* 音标列：使用等宽字体，颜色区分 */
+.col-phonetic { width: 20%; color: #7cc0ff; font-family: 'Consolas', monospace; }
+
+/* 释义列：增加行高，让长段文字易读 */
+.col-def { width: 45%; color: #aaa; line-height: 1.6; }
+
+/* 按钮列：靠右对齐 */
+.col-action { width: 10%; text-align: right; }
     </style>
 </head>
 <body>
@@ -870,19 +898,20 @@ function handleBookChange(selectElement) {
         if (activeDisplayList.length === 0) {
             rawTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">🎉 这一段全部斩杀完毕或没有数据！</td></tr>`;
         } else {
-            rawTbody.innerHTML = activeDisplayList.map(item => `
-                <tr id="row-raw-${item.word}">
-                    <td style="font-weight:500; font-size:1.05rem; color:var(--text-main);">${item.word}</td>
-                    <td style="color:#7cc0ff;">
-                      <span style="font-family: monospace; color:#7cc0ff; margin-right:8px;">${item.phonetic || '🔇 no phonetic'}</span>
-                      <span onclick="playWordAudio('${item.word}')" style="cursor:pointer; font-size:16px;">🔊</span>
-                    </td>
-                    <td style="color:var(--text-muted);">${formatDefinition(item.definition)}</td>
-                    <td style="text-align:right;">
-                        <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem; background:rgba(236,146,142,0.1); color: var(--accent-danger); border-color:rgba(236,146,142,0.2);" onclick="singleKill('${item.word}')">斩杀</button>
-                    </td>
-                </tr>
-            `).join('');
+            // 在 renderMainTables 中修改 rawTbody 的渲染方式
+rawTbody.innerHTML = activeDisplayList.map(item => `
+    <tr id="row-raw-${item.word}">
+        <td class="col-word">${item.word}</td>
+        <td class="col-phonetic">
+            ${item.phonetic || ''}
+            <span onclick="playWordAudio('${item.word}')" style="cursor:pointer; margin-left:8px;">🔊</span>
+        </td>
+        <td class="col-def">${item.definition}</td>
+        <td class="col-action">
+            <button class="btn-danger" onclick="singleKill('${item.word}')">斩杀</button>
+        </td>
+    </tr>
+`).join('');
         }
 
         const killedTbody = document.getElementById('killedWordTableBody');
@@ -929,7 +958,20 @@ async function syncWithServer(url, payload, rollbackAction) {
 }
 
 
-    async function singleKill(word) {
+
+// 在获取单词列表后，增加排序逻辑
+function getSmartBombList(allWords, killedWords) {
+    // 过滤掉已熟练的词
+    let queue = allWords.filter(w => !killedWords.has(w.word));
+
+    // 模拟 SRS 排序：将上次复习时间较早的词排在前面
+    return queue.sort((a, b) => (a.lastReview || 0) - (b.lastReview || 0));
+}
+
+
+    // 改进后的 singleKill，增加难度分层记录
+    async function singleKill(word, difficulty = 'easy') {
+    // difficulty: 'hard' (重学), 'medium' (似曾相识), 'easy' (熟词)
     // 1. 乐观更新：立即修改本地内存并渲染
     killedWords.add(word);
     renderMainTables();
@@ -939,7 +981,12 @@ async function syncWithServer(url, payload, rollbackAction) {
         const response = await fetch(`${API_BASE}/kill`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ book: currentBookId, word: word })
+            body: JSON.stringify({
+                book: currentBookId,
+                word: word,
+                status: difficulty, // 新增：标记难度
+                lastReview: Date.now()
+            })
         });
 
         if (!response.ok) throw new Error('Server error');
@@ -999,32 +1046,43 @@ async function syncWithServer(url, payload, rollbackAction) {
 async function startWordBomb() {
     if (activeDisplayList.length === 0) return alert("当前选择的列表中无待背单词！");
 
-    let savedIndex = 0;
+    let targetWord = null;
 
+    // 1. 获取进度
     try {
         const res = await fetch(`${API_BASE}/progress/load?bookId=${currentBookId}`);
-        if (!res.ok) throw new Error("加载进度接口请求失败");
+        const progressData = await res.json();
 
-        const allPagesProgress = await res.json();
-        const savedIndexForCurrentPage = allPagesProgress[vm.currentPage.toString()];
-
-        // --- 核心优化点 ---
-        if (savedIndexForCurrentPage !== undefined && savedIndexForCurrentPage > 0) {
-            // 只有当 savedIndex 大于 0 时才弹出提示
-            if (confirm(`检测到第 ${vm.currentPage} 页上次背到第 ${savedIndexForCurrentPage + 1} 个单词，是否继续？`)) {
-                savedIndex = savedIndexForCurrentPage;
-            }
+        // ⚡ 直接读取 lastWord 字段
+        if (progressData && progressData.lastWord) {
+            targetWord = progressData.lastWord;
         }
-        // 如果 savedIndexForCurrentPage 为 0 或 undefined，则自动保持 savedIndex = 0，不弹框
     } catch (e) {
-        console.warn("加载进度失败，默认从头开始", e);
+        console.warn("读取进度失败，从当前页开始", e);
     }
 
-    // 初始化轰炸列表
-    bombList = [...activeDisplayList];
-    bombIndex = savedIndex;
+    // 2. 如果找到了进度单词，计算页码并跳转 (逻辑保持不变)
+    if (targetWord) {
+        const unkilledWords = allWords.filter(item => !killedWords.has(item.word));
+        const index = unkilledWords.findIndex(item => item.word === targetWord);
 
-    // 显示 UI
+        if (index !== -1) {
+            const pageOfWord = Math.floor(index / vm.pageSize) + 1;
+            if (pageOfWord !== vm.currentPage) {
+                if (confirm(`检测到上次背到了“${targetWord}”（在第 ${pageOfWord} 页），是否跳转至该页继续？`)) {
+                    vm.currentPage = pageOfWord;
+                    renderMainTables();
+                }
+            }
+        }
+    }
+
+    // 3. 定位到正确索引
+    const foundIndex = activeDisplayList.findIndex(item => item.word === targetWord);
+    bombList = [...activeDisplayList];
+    bombIndex = (foundIndex !== -1) ? foundIndex : 0;
+
+    // 4. 显示 UI
     document.getElementById('bombOverlay').style.display = 'flex';
     showBombWord(false);
     updateBombHeaderUI();
@@ -1158,12 +1216,12 @@ async function saveProgressToBackend() {
     // 只有在轰炸过程中才进行保存
     if (!currentBookId) return;
 
-const payload = {
+    // 获取当前正在轰炸的单词
+    const currentWord = bombList[bombIndex] ? bombList[bombIndex].word : null;
+
+    const payload = {
         bookId: currentBookId,
-        lastWordIndex: bombIndex,
-        currentPage: vm.currentPage, // 必须存入页码
-        pageSize: vm.pageSize,       // 必须存入分页大小
-        timestamp: Date.now()
+        lastWord: currentWord // 👈 这里的键名必须与后端的 get("lastWord") 完全一致
     };
 
     try {
