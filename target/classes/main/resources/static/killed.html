@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>熟词斩杀回收舱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<div id="app" class="p-6 md:p-12 max-w-5xl mx-auto space-y-6" v-cloak>
+
+    <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+        <div>
+            <h2 class="text-xl font-black text-emerald-400">🛡️ 熟词安全隔离舱 (可批量复活)</h2>
+            <p class="text-xs text-slate-400">实时展示已被剔除的单词，支持在前端及 Java 磁盘文件中同步抹除还原</p>
+        </div>
+        <a href="word-bombing.html" class="px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs transition">返回轰炸主战场</a>
+    </div>
+
+    <div class="flex justify-between items-center bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+        <div class="text-xs space-x-3 flex items-center">
+            <button @click="toggleSelectAll" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg font-medium transition">
+                {{ selectedIds.size === killedWordsList.length && killedWordsList.length > 0 ? '反选全部' : '全选当前' }}
+            </button>
+            <span class="text-slate-400">已勾选 <strong class="text-emerald-400 font-mono text-sm">{{ selectedIds.size }}</strong> 个被杀单词</span>
+        </div>
+        <button v-if="selectedIds.size > 0" @click="batchRestore" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-950/50 transition">
+            ↩️ 批量同步复活：重新送回主战场
+        </button>
+    </div>
+
+    <div class="overflow-hidden border border-slate-800 bg-slate-900/20 rounded-2xl shadow-xl">
+        <table class="w-full text-left border-collapse text-xs font-mono">
+            <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-800">
+                <th class="p-4 w-16 text-center">选择</th>
+                <th class="p-4 w-12 text-slate-600">ID</th>
+                <th class="p-4 w-40 text-rose-300">单词</th>
+                <th class="p-4">核心真题释义</th>
+                <th class="p-4 w-28 text-center">救回操作</th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-900">
+            <tr v-for="word in killedWordsList" :key="word.id" :class="[selectedIds.has(word.id) ? 'bg-emerald-950/10' : 'hover:bg-slate-900/40 transition-colors']">
+                <td class="p-4 text-center">
+                    <input type="checkbox" :checked="selectedIds.has(word.id)" @change="toggleSelect(word.id)" class="w-4 h-4 accent-emerald-500 bg-slate-950 border-slate-800 rounded">
+                </td>
+                <td class="p-4 text-slate-600">{{ word.id }}</td>
+                <td class="p-4 text-slate-200 font-black text-sm">{{ word.word }}</td>
+                <td class="p-4 text-slate-400">{{ word.definition }}</td>
+                <td class="p-4 text-center">
+                    <button @click="singleRestore(word.id)" class="px-3 py-1 bg-slate-900 hover:bg-emerald-950 border border-slate-800 hover:border-emerald-800 text-emerald-400 rounded-lg transition-all">
+                        还原复活
+                    </button>
+                </td>
+            </tr>
+            <tr v-if="killedWordsList.length === 0">
+                <td colspan="5" class="p-12 text-center text-slate-500 text-xs">
+                    🍃 暂无熟词。说明全部 6026 词均在正常轰炸队列中！
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const allStaticWords = ref([]);     // 6026词大纲
+            const combinedKilledIds = ref([]); // 动静两端合并出的熟词 ID 名单
+            const selectedIds = ref(new Set()); // 前端临时勾选的 Set
+
+            // 计算属性：通过 ID 映射出完整的单词实体，渲染进列表
+            const killedWordsList = computed(() => {
+                const idSet = new Set(combinedKilledIds.value);
+                return allStaticWords.value.filter(w => idSet.has(Number(w.id)));
+            });
+
+            async function loadData() {
+                try {
+                    const [wordsRes, staticKilledRes, javaKilledRes] = await Promise.all([
+                        fetch('words_data.json'),
+                        fetch('killed_data.json').catch(() => null),
+                        fetch('http://localhost:8080/api/dynamic-killed').catch(() => null)
+                    ]);
+
+                    allStaticWords.value = await wordsRes.json();
+
+                    let staticIds = [];
+                    if (staticKilledRes && staticKilledRes.ok) staticIds = await staticKilledRes.json();
+
+                    let javaIds = [];
+                    if (javaKilledRes && javaKilledRes.ok) {
+                        const data = await javaKilledRes.json();
+                        if (data.success) javaIds = data.killedIds;
+                    }
+
+                    // 合并展现
+                    combinedKilledIds.value = Array.from(new Set([...staticIds.map(Number), ...javaIds.map(Number)]));
+                } catch (e) {
+                    console.error("加载出差，请确保 Java 服务运行在 localhost:8080", e);
+                }
+            }
+
+            // 批量提交请求给 Java 后端回滚磁盘
+            async function executeRestoreAPI(ids) {
+                try {
+                    const res = await fetch('http://localhost:8080/api/restore-word', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ wordIds: ids })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        // 重新载入，刷洗视图
+                        await loadData();
+                    } else {
+                        alert("后端抛出错误: " + data.message);
+                    }
+                } catch (e) {
+                    alert("网络异常，无法连接到 Java 后端服务器");
+                }
+            }
+
+            // 单个词立即救回
+            async function singleRestore(id) {
+                selectedIds.value.delete(id);
+                await executeRestoreAPI([id]);
+            }
+
+            // 批量选中的词救回
+            async function batchRestore() {
+                if (selectedIds.value.size === 0) return;
+                const arrayToRestore = [...selectedIds.value];
+                selectedIds.value.clear();
+                await executeRestoreAPI(arrayToRestore);
+            }
+
+            function toggleSelect(id) {
+                if (selectedIds.value.has(id)) selectedIds.value.delete(id);
+                else selectedIds.value.add(id);
+            }
+
+            function toggleSelectAll() {
+                if (selectedIds.value.size === killedWordsList.value.length) {
+                    selectedIds.value.clear();
+                } else {
+                    selectedIds.value = new Set(killedWordsList.value.map(w => w.id));
+                }
+            }
+
+            onMounted(loadData);
+
+            return { killedWordsList, selectedIds, toggleSelect, toggleSelectAll, singleRestore, batchRestore };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>本地墨墨 - 批量注入中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-slate-100 p-6">
+<div id="import-app" class="max-w-2xl mx-auto bg-white rounded-2xl shadow p-6">
+    <div class="flex justify-between items-center border-b pb-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">📥 批量导入词汇集</h1>
+            <p class="text-sm text-slate-400 mt-0.5">支持外部TXT/CSV大批量高能瞬间注入</p>
+        </div>
+        <a href="admin.html" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium">返回后台</a>
+    </div>
+
+    <div class="space-y-5 text-sm">
+        <div class="bg-slate-50 p-4 rounded-xl border">
+            <label class="block font-bold text-slate-700 mb-2">1. 选择导入的目标词书：</label>
+            <div class="flex space-x-6">
+                <label v-for="c in ['中考','高考','考研']" class="inline-flex items-center cursor-pointer font-medium"><input type="radio" v-model="target" :value="c" class="mr-1.5">{{c}}词书</label>
+            </div>
+        </div>
+
+        <div>
+            <label class="block font-bold text-slate-700 mb-2">2. 粘贴符合格式的词汇文本：</label>
+            <textarea v-model="text" rows="8" class="w-full p-3 border rounded-xl font-mono text-xs outline-none" placeholder="标准格式：单词,音标,释义,经典例句（每行一个）&#10;obvious,ˈɒbviəs,adj. 明显的,It's an obvious mistake."></textarea>
+        </div>
+
+        <div v-if="parsed.length > 0" class="border rounded-xl bg-slate-50/50 p-4 space-y-3">
+            <div class="flex justify-between font-bold text-xs text-slate-500"><span>📊 解析成功预览 (前3条)</span><span>目标分类: {{target}}</span></div>
+            <div class="divide-y text-xs">
+                <div v-for="p in parsed.slice(0,3)" class="py-1"><strong>{{p.word}}</strong> - <span class="text-slate-500">/{{p.phonetic}}/</span> - {{p.definition}}</div>
+            </div>
+            <button @click="commit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition">确认注入此批共计 {{parsed.length}} 个单词</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, watch } = Vue;
+    createApp({
+        setup() {
+            const target = ref('中考'); const text = ref(''); const parsed = ref([]);
+
+            watch([text, target], () => {
+                const list = [];
+                text.value.split('\n').forEach(line => {
+                    if(!line.trim()) return;
+                    const parts = line.split(',');
+                    if(parts.length >= 3) {
+                        list.push({ word:parts[0].trim(), phonetic:parts[1].trim(), definition:parts[2].trim(), example:parts[3]?parts[3].trim():'无例句', category:target.value });
+                    }
+                });
+                parsed.value = list;
+            });
+
+            async function commit() {
+                const res = await fetch('/api/batch-import', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parsed.value) });
+                if((await res.json()).status === 'success') { alert("🎉 批量注入成功！"); text.value = ''; parsed.value = []; }
+            }
+            return { target, text, parsed, commit };
+        }
+    }).mount('#import-app');
+</script>
+</body>
+</html>

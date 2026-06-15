@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考研闪记 - AI-全屏极致专注轰炸机</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <style>
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans no-select selection:bg-indigo-500 selection:text-white overflow-hidden">
+
+<div id="app" class="w-screen h-screen flex flex-col justify-between relative">
+
+    <div v-if="!currentCategory" class="flex-1 flex flex-col justify-between p-8 md:p-16 max-w-2xl mx-auto w-full">
+        <div class="text-center mt-8 space-y-4">
+            <div class="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl mx-auto flex items-center justify-center text-white text-4xl font-black shadow-xl shadow-indigo-500/20">闪</div>
+            <h2 class="text-3xl font-black text-slate-100 tracking-wider">考研词汇闪过 · 全屏漏斗机</h2>
+            <p class="text-sm text-slate-400 tracking-wide">已移除全网杂乱干扰 · 戴上耳机 · 智能音频步进控制</p>
+        </div>
+
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 space-y-6 my-auto">
+            <div class="text-sm font-bold text-indigo-400 tracking-widest uppercase flex items-center space-x-2">
+                <span>⚙️</span> <span>双重时序与视觉留白调校</span>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center text-base">
+                    <span class="text-slate-300 font-medium">1. 【显英文】留白猜词时间:</span>
+                    <span class="text-indigo-400 font-mono font-bold text-lg">{{ timerConfig.eng }}秒</span>
+                </div>
+                <input type="range" min="0.5" max="3.0" step="0.1" v-model.number="timerConfig.eng" class="w-full accent-indigo-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer">
+
+                <div class="flex justify-between items-center text-base">
+                    <span class="text-emerald-400 font-medium">2. 【显中文】视觉最短留白:</span>
+                    <span class="text-emerald-400 font-mono font-bold text-lg">{{ timerConfig.zhMin }}秒</span>
+                </div>
+                <input type="range" min="0.5" max="3.0" step="0.1" v-model.number="timerConfig.zhMin" class="w-full accent-emerald-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div class="text-xs text-slate-500 leading-relaxed border-t border-slate-800/80 pt-4 bg-slate-950/20 p-2 rounded-lg">
+                💡 <b>音画对齐双闸门机制：</b>单词出现即发音，猜词期满后显示中文。显示中文后，系统会启动双重安全锁：<b>只有同时满足“发音彻底读完”且“中文释义在屏幕上展现满 {{ timerConfig.zhMin }} 秒”，才会切入下一个。</b>长词随读音延长，短词有底线视觉停留，网络报错则直接触发秒过。
+            </div>
+        </div>
+
+<!--        <div class="space-y-3 mb-8">-->
+<!--            <div class="grid grid-cols-2 gap-3">-->
+<!--                <button @click="selectCategory('中考')" class="py-4 bg-slate-900 border border-slate-800 text-slate-300 font-bold rounded-xl text-center hover:bg-slate-800 hover:border-slate-700 transition">👦 中考必刷词</button>-->
+<!--                <button @click="selectCategory('高考')" class="py-4 bg-slate-900 border border-slate-800 text-slate-300 font-bold rounded-xl text-center hover:bg-slate-800 hover:border-slate-700 transition">🧑 高考冲刺词</button>-->
+<!--            </div>-->
+<!--            <button @click="selectCategory('考研')" class="w-full py-5 bg-gradient-to-r from-indigo-900/80 to-indigo-800 border border-indigo-500/40 text-white font-extrabold text-lg rounded-xl tracking-wider hover:from-indigo-800 hover:to-indigo-700 transition shadow-lg shadow-indigo-950">-->
+<!--                🎓 2027考研闪记核心词书 · 开启智能轰炸-->
+<!--            </button>-->
+<!--        </div>-->
+
+        <div class="space-y-3 mb-8">
+
+            <div class="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-4 space-x-4">
+
+                <!-- 左侧标题 -->
+                <div class="flex items-center space-x-2 text-slate-300 font-bold whitespace-nowrap">
+                    <span>📚</span>
+                    <span>单词书选择</span>
+                </div>
+
+                <!-- 中间下拉框 -->
+                <select
+                        v-model="selectedBook"
+                        class="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-sm font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500"
+                >
+                    <option disabled value="">请选择词库</option>
+                    <option value="考研">🎓 考研核心词</option>
+                    <option value="中考">👦 中考必刷词</option>
+                    <option value="高考">🧑 高考冲刺词</option>
+
+                </select>
+
+                <!-- 右侧开始按钮 -->
+                <button
+                        @click="selectCategory(selectedBook)"
+                        :disabled="!selectedBook"
+                        class="px-4 py-2 rounded-lg font-bold text-sm transition whitespace-nowrap"
+                        :class="selectedBook
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
+                >
+                    🚀 开始轰炸
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="text-center">
+            <a href="admin.html" class="text-xs text-slate-600 font-semibold hover:text-indigo-400 transition tracking-wider">⚙️ 词库管理后台</a>
+            <span class="mx-3 text-slate-800">|</span>
+            <a href="import.html" class="text-xs text-slate-600 font-semibold hover:text-indigo-400 transition tracking-wider">📥 批量词汇集导入中心</a>
+        </div>
+    </div>
+
+    <div v-else class="flex-1 flex flex-col justify-between bg-slate-950 select-none">
+        <header class="w-full px-6 py-4 border-b border-slate-900/60 bg-slate-900/20 backdrop-blur-md flex justify-between items-center z-10">
+            <button @click="stopLoop(); currentCategory = null" class="text-slate-500 hover:text-slate-300 text-sm font-medium transition flex items-center space-x-1">
+                <span>◀</span> <span>退出轰炸</span>
+            </button>
+            <div class="flex items-center space-x-2">
+                <span class="font-black tracking-widest text-slate-200 bg-slate-800/80 px-4 py-1 rounded-full text-xs uppercase border border-slate-700/50">
+                    {{ currentCategory }}
+                </span>
+                <span :class="['font-black tracking-widest px-4 py-1 rounded-full text-xs border', isFilterMode ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20']">
+                    {{ isFilterMode ? '第 '+roundCount+' 轮生词漏斗' : '全量第一轮' }}
+                </span>
+            </div>
+            <div class="text-slate-400 text-sm">
+                扫描进度: <strong class="text-indigo-400 font-mono text-lg">{{ currentIndex + 1 }}</strong> / <span class="font-mono text-slate-500">{{ activeQueue.length }}</span>
+            </div>
+        </header>
+
+        <div class="w-full bg-slate-900 h-1 relative">
+            <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full transition-all duration-300 shadow-md shadow-indigo-500/20" :style="{ width: progressPercent + '%' }"></div>
+        </div>
+
+        <main class="flex-1 w-full flex flex-col justify-center items-center px-8 relative max-w-4xl mx-auto">
+            <div v-if="currentWord" class="w-full text-center space-y-16">
+
+                <div class="space-y-4 relative group">
+                    <h1 class="text-6xl md:text-8xl font-black text-white tracking-wide font-mono drop-shadow-xl animate-[fadeIn_0.2s_ease-out]">
+                        {{ currentWord.word }}
+                    </h1>
+                    <p @click="playAudioDirectly(currentWord.word)" class="text-lg md:text-xl text-slate-500 font-mono tracking-widest font-medium cursor-pointer hover:text-indigo-400 transition inline-block">
+                        /{{ currentWord.phonetic }}/ <span>🔊</span>
+                    </p>
+                </div>
+
+                <div class="h-40 flex items-center justify-center w-full max-w-xl mx-auto">
+                    <div v-if="showAnswer" class="w-full bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl animate-[scaleUp_0.15s_ease-out]">
+                        <p class="text-2xl font-extrabold text-emerald-400 tracking-wide">{{ currentWord.definition }}</p>
+                        <p class="text-sm text-slate-400 italic mt-3 line-clamp-2 px-4 leading-relaxed font-mono">
+                            " {{ currentWord.example }} "
+                        </p>
+                    </div>
+                    <div v-else class="w-1.5 h-1.5 bg-indigo-500/20 rounded-full animate-ping"></div>
+                </div>
+            </div>
+
+            <div v-else class="text-center space-y-8 max-w-md w-full animate-[fadeIn_0.3s_ease-out]">
+                <div class="text-6xl">🏁</div>
+                <h2 class="text-2xl font-black text-slate-100 tracking-wide">本轮扫描过滤已完成</h2>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-left space-y-4 shadow-2xl">
+                    <div class="flex justify-between text-sm border-b border-slate-800/60 pb-3">
+                        <span class="text-slate-400">本轮过滤词汇总量:</span>
+                        <span class="text-slate-200 font-bold font-mono text-base">{{ activeQueue.length }} 词</span>
+                    </div>
+                    <div class="flex justify-between text-sm items-center">
+                        <span class="text-rose-400 font-bold flex items-center space-x-1">
+                            <span>🎯</span> <span>漏斗截留出的生词 :</span>
+                        </span>
+                        <span class="text-rose-400 font-black font-mono text-xl bg-rose-950/50 px-3 py-0.5 rounded-md border border-rose-900/30">
+                            {{ markedIds.size }} 词
+                        </span>
+                    </div>
+                </div>
+
+                <div class="space-y-3 pt-4">
+                    <button v-if="markedIds.size > 0" @click="startNextFilterRound" class="w-full py-4.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-base rounded-xl shadow-lg hover:opacity-95 transition tracking-wider active:scale-[0.99]">
+                        🔥 提纯！开启第 {{ roundCount + 1 }} 轮生词漏斗 (剩{{ markedIds.size }}词)
+                    </button>
+                    <button v-else @click="resetToFull" class="w-full py-4.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-base rounded-xl shadow-lg hover:opacity-95 transition tracking-wider active:scale-[0.99]">
+                        🎉 斩平全册！重新全量洗牌一轮
+                    </button>
+                    <button @click="stopLoop(); currentCategory = null" class="w-full py-3 bg-slate-900 text-slate-500 text-xs font-bold rounded-xl border border-slate-800/60 hover:text-slate-300 transition">
+                        返回主配置页
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="w-full p-6 border-t border-slate-900/60 bg-slate-950/60 backdrop-blur-md flex justify-center">
+            <div v-if="currentWord" class="w-full max-w-xl flex flex-col items-center space-y-4">
+<!--                <button @click="markAsMastered" class="w-full py-5 bg-rose-600 hover:bg-rose-700 text-white font-black text-lg rounded-xl shadow-xl shadow-rose-950/20 transition flex items-center justify-center space-x-3 active:scale-[0.98]">-->
+<!--                    <span>💥 太熟了 / 直接斩杀剔出 [ ✂ ]</span>-->
+<!--                    <span class="text-xs font-medium bg-black/30 px-2 py-0.5 rounded border border-white/10 font-mono tracking-widest">SPACE / ENTER</span>-->
+<!--                </button>-->
+
+                <div class="w-full flex justify-between items-center text-xs px-1">
+                    <div class="flex items-center space-x-4">
+                        <button @click="toggleAudioSwitch" :class="['px-3 py-1.5 rounded-lg border font-bold flex items-center space-x-1.5 transition duration-150', autoAudioEnabled ? 'bg-indigo-600/30 text-indigo-400 border-indigo-500/40' : 'bg-slate-900 text-slate-500 border-slate-800']">
+                            <span>{{ autoAudioEnabled ? '🔊 自动发音: 开启' : '🔇 自动发音: 已关' }}</span>
+                        </button>
+
+                        <button @click="togglePause" class="text-slate-400 font-bold hover:text-slate-300 transition">
+                            {{ isPaused ? '▶ 继续自动滚动' : '⏸ 临时暂停' }}
+                        </button>
+                    </div>
+                    <span class="text-slate-600 font-mono hidden md:inline">💡 双闸门控速：声音读完 + 中文看满，对账轻松。</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, onUnmounted } = Vue;
+    createApp({
+        setup() {
+            const currentCategory = ref(null);
+            const rawServerWords = ref([]);
+            const activeQueue = ref([]);
+            const currentIndex = ref(0);
+            const showAnswer = ref(false);
+            const isPaused = ref(false);
+            const wordStatsMap = ref(new Map());
+
+            const markedIds = ref(new Set());
+            const isFilterMode = ref(false);
+            const roundCount = ref(1);
+            const autoAudioEnabled = ref(true);
+            const selectedBook = ref("");
+
+            // 配置项：eng为英文留白，zhMin为中文最少看够多少秒
+            const timerConfig = ref({ eng: 1.5, zhMin: 1.2 });
+            let masterTimer = null;
+            let currentAudioObject = null;
+
+            let isAudioValid = false;
+            let isAudioFinished = false; // 追踪当前单词音频是否已经真正播完
+
+            const currentWord = computed(() => activeQueue.value[currentIndex.value] || null);
+            const progressPercent = computed(() => activeQueue.value.length === 0 ? 0 : Math.round((currentIndex.value / activeQueue.value.length) * 100));
+
+            async function selectCategory(category) {
+                currentCategory.value = category;
+                resetMetrics();
+                try {
+                    const res = await fetch('/api/words');
+                    const all = await res.json();
+                    // rawServerWords.value = all.filter(w => w.category === category).sort(() => Math.random() - 0.5);
+                    rawServerWords.value = all
+  .filter(w => w.category === category)
+  .map(w => ({
+    ...w,
+
+    // 🧠 AI核心字段
+    mastery: 0,          // 熟练度
+    seenCount: 0,        // 出现次数
+    correctCount: 0,     // 正确次数（暂时先默认0）
+    lastSeenTime: Date.now(),
+
+    // 难度权重
+    difficultyScore: Math.random() * 0.5 + 0.5
+  }))
+  .sort(() => Math.random() - 0.5);
+                    activeQueue.value = rawServerWords.value.slice(0, 300);
+                    startCoreLoop();
+                } catch (e) {
+                    alert("本地后端Spring Boot服务器好像未跑起来，请检查 LocalMomoApplication 是否运行！");
+                    currentCategory.value = null;
+                }
+            }
+
+            // AI评分函数（核心大脑）
+            function updateAIMastery(word) {
+    word.seenCount++;
+
+    const now = Date.now();
+    const days = (now - word.lastSeenTime) / (1000 * 60 * 60 * 24);
+
+    const timeDecay = 1 / (1 + days);
+    const accuracy = word.correctCount / Math.max(word.seenCount, 1);
+
+    word.mastery =
+        accuracy * timeDecay * word.difficultyScore;
+
+    word.lastSeenTime = now;
+}
+
+            // 升级版：音画对齐双向并轨决策引擎
+            function startCoreLoop() {
+                if (masterTimer) clearTimeout(masterTimer);
+                if (currentAudioObject) {
+                    currentAudioObject.onended = null;
+                    currentAudioObject.onerror = null;
+                    currentAudioObject.pause();
+                }
+                if (isPaused.value || !currentWord.value) return;
+                if (currentWord.value) {
+                      updateAIMastery(currentWord.value);
+                }
+
+                showAnswer.value = false;
+                isAudioValid = false;
+                isAudioFinished = false;
+
+                // 射出发音
+                if (autoAudioEnabled.value) {
+                    prepareAndPlayAudio(currentWord.value.word);
+                }
+
+                // 阶段一：纯英文留白思考期
+                masterTimer = setTimeout(() => {
+                    // 阶段二：思考期满，吐出中文答案
+                    showAnswer.value = true;
+
+                    // 阶段三：合并决策判定机制
+                    // 检查此时音频是否可用，且还没有播放完
+                    if (autoAudioEnabled.value && isAudioValid && !isAudioFinished) {
+
+                        // 1. 如果中文展示的最短时限【先到】：等待音频结束再切
+                        let zhMinTimerFinished = false;
+                        let zhMinTimer = setTimeout(() => {
+                            zhMinTimerFinished = true;
+                            // 如果音频此时已经在我等中文的期间放完了，立刻切词
+                            if (isAudioFinished && !isPaused.value) nextWord();
+                        }, timerConfig.value.zhMin * 1000);
+
+                        // 2. 绑定音频播放结束事件
+                        currentAudioObject.onended = () => {
+                            isAudioFinished = true;
+                            // 只有当声音放完了，且中文看够了时间，才允许切词
+                            if (zhMinTimerFinished && !isPaused.value) {
+                                nextWord();
+                            }
+                        };
+
+                        // 3. 播放中途断网等异常容错
+                        currentAudioObject.onerror = () => {
+                            clearTimeout(zhMinTimer);
+                            triggerDefaultZhDelay();
+                        };
+
+                    } else {
+                        // 场景：音频接口挂了、被关了，或者音频超级短在猜词1.5秒内早已放完
+                        // 严格卡死中文必须展示满 zhMin 秒，让眼睛看个清楚！
+                        triggerDefaultZhDelay();
+                    }
+
+                }, timerConfig.value.eng * 1000);
+            }
+
+
+            function markAsMastered() {
+    if (!currentWord.value) return;
+
+    // 🧠 AI行为：标记为已掌握（不再强化）
+    currentWord.value.correctCount++;
+
+    // ✂ 从队列移除
+    activeQueue.value.splice(currentIndex.value, 1);
+
+    if (currentIndex.value >= activeQueue.value.length) {
+        currentIndex.value = 0;
+    }
+
+    if (masterTimer) clearTimeout(masterTimer);
+
+    startCoreLoop();
+}
+
+
+
+            // 精准执行中文看够底线时间后平滑步进
+            function triggerDefaultZhDelay() {
+                if (masterTimer) clearTimeout(masterTimer);
+                masterTimer = setTimeout(() => {
+                    if (!isPaused.value) nextWord();
+                }, timerConfig.value.zhMin * 1000);
+            }
+
+            // 音频实体工厂
+            function prepareAndPlayAudio(word) {
+                try {
+                    currentAudioObject = new Audio(`https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`);
+
+                    currentAudioObject.onplay = () => { isAudioValid = true; };
+                    currentAudioObject.canplaythrough = () => { isAudioValid = true; };
+
+                    currentAudioObject.onended = () => {
+                        isAudioFinished = true;
+                    };
+
+                    currentAudioObject.onerror = () => {
+                        isAudioValid = false;
+                        isAudioFinished = true;
+                        // 如果在已经出答案后报错，直接走中文视觉兜底
+                        if (showAnswer.value && !isPaused.value) {
+                            triggerDefaultZhDelay();
+                        }
+                    };
+
+                    currentAudioObject.play().catch(() => { isAudioValid = false; });
+                } catch (e) {
+                    isAudioValid = false;
+                }
+            }
+
+            function playAudioDirectly(word) {
+                const audio = new Audio(`https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`);
+                audio.play().catch(()=>{});
+            }
+
+            function nextWord() {
+    if (!currentWord.value) return;
+
+    const word = currentWord.value;
+
+    // 🧠 AI判断：是否“毕业”
+    if (word.mastery > 0.85) {
+        // ✂ 太熟 → 直接剔除
+        activeQueue.value.splice(currentIndex.value, 1);
+    } else {
+        // 🔁 不熟 → 进入下一词
+        currentIndex.value++;
+    }
+
+    // 防越界
+    if (currentIndex.value >= activeQueue.value.length) {
+        currentIndex.value = 0;
+    }
+
+    // 🔥 重新启动节奏
+    startCoreLoop();
+}
+
+
+            function startNextFilterRound() {
+                const unfamiliarList = activeQueue.value.filter(w => markedIds.value.has(w.id));
+                activeQueue.value = unfamiliarList.sort(() => Math.random() - 0.5);
+                currentIndex.value = 0;
+                showAnswer.value = false;
+                isFilterMode.value = true;
+                roundCount.value++;
+                markedIds.value.clear();
+                isPaused.value = false;
+                startCoreLoop();
+            }
+
+            function resetToFull() {
+                resetMetrics();
+                activeQueue.value = rawServerWords.value.sort(() => Math.random() - 0.5).slice(0, 300);
+                startCoreLoop();
+            }
+
+            function resetMetrics() {
+                currentIndex.value = 0;
+                showAnswer.value = false;
+                isFilterMode.value = false;
+                roundCount.value = 1;
+                markedIds.value.clear();
+                isPaused.value = false;
+            }
+
+            function togglePause() {
+                isPaused.value = !isPaused.value;
+                if (!isPaused.value) {
+                    startCoreLoop();
+                } else {
+                    if (masterTimer) clearTimeout(masterTimer);
+                    if (currentAudioObject) {
+                        currentAudioObject.onended = null;
+                        currentAudioObject.onerror = null;
+                        currentAudioObject.pause();
+                    }
+                }
+            }
+
+            function toggleAudioSwitch() {
+                autoAudioEnabled.value = !autoAudioEnabled.value;
+            }
+
+            function stopLoop() {
+                if (masterTimer) clearTimeout(masterTimer);
+                if (currentAudioObject) currentAudioObject.pause();
+            }
+
+            window.addEventListener('keydown', (e) => {
+                if (currentCategory.value && currentWord.value) {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        markAsMastered();
+                    }
+                }
+            });
+
+            onUnmounted(stopLoop);
+
+            return {
+                selectedBook , currentCategory, activeQueue, currentIndex, currentWord, showAnswer, progressPercent,
+                timerConfig, markedIds, isFilterMode, roundCount, isPaused, autoAudioEnabled,
+                selectCategory, startNextFilterRound, resetToFull, togglePause, toggleAudioSwitch, playAudioDirectly, stopLoop, markAsMastered
+            };
+        }
+    }).mount('#app');
+</script>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes scaleUp {
+        from { opacity: 0; transform: scale(0.96); }
+        to { opacity: 1; transform: scale(1); }
+    }
+</style>
+</body>
+</html>
