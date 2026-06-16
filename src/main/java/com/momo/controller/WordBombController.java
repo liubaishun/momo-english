@@ -1,18 +1,19 @@
 package com.momo.controller;
 
-//import com.momo.repository.WordRepository;
 
 import com.momo.dto.KillRequest;
 import com.momo.model.Word;
 import com.momo.dto.Req;
+import com.momo.repository.WordRepository;
 import com.momo.service.MasteredJsonStore;
 import com.momo.service.WordService;
 
+import com.momo.service.WordState;
+import com.momo.utils.HelperUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-//import org.springframework.data.domain.PageRequest;
-//import org.springframework.data.domain.Pageable;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,8 +27,8 @@ public class WordBombController {
     @Autowired
     private WordService wordService;
 
-//    @Autowired
-//    private WordRepository wordRepository;
+    @Autowired
+    private WordRepository wordRepository;
 
     /**
      * 1. 获取左侧单词书选项列表
@@ -48,14 +49,14 @@ public class WordBombController {
 
     }
 
-    /**
-     * 2. 根据选定的单词书获取其全部单词
-     */
-    @GetMapping("/list")
-    public List<Map<String, Object>> getWordsByBook(@RequestParam("book") String bookName) {
-
-        return wordService.getStaticWordsByBook(bookName);
-    }
+//    /**
+//     * 2. 根据选定的单词书获取其全部单词
+//     */
+//    @GetMapping("/list")
+//    public List<Map<String, Object>> getWordsByBook(@RequestParam("book") String bookName) {
+//
+//        return wordService.getStaticWordsByBook(bookName);
+//    }
 
     // 。1. 标记已掌握 API
     @PostMapping("/mastered")
@@ -80,16 +81,13 @@ public class WordBombController {
     }
 
 
-
     /**
      * 3. 获取某本单词书被斩杀的熟词
      */
     @GetMapping("/killed")
     public Set<String> getKilledWords(@RequestParam("book") String bookName) {
-        return wordService.getKilledWordsByBook(  bookName);
+        return wordService.getKilledWordsByBook(bookName);
     }
-
-
 
 
     @GetMapping("/getWords")
@@ -105,8 +103,12 @@ public class WordBombController {
     public Map<String, Object> getWordsByPage(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String category) {
 
         // 1. 读取 words_data.json 并筛选 category (参考原有逻辑)
-//        List<Word> allWords = loadAllWordsFromFile();
+        //List<Word> allWords = loadAllWordsFromFile();
+        List<Map<String, Object>> kaoyan = wordService.getStaticWordsByBook("kaoyan");
+
         List<Word> allWords = new ArrayList<>();
+
+        allWords = HelperUtil.convertWithBeanUtils(kaoyan);
         List<Word> filtered = allWords.stream().filter(w -> category == null || w.getCategory().equals(category)).collect(Collectors.toList());
 
         // 2. 计算分页切片
@@ -116,6 +118,7 @@ public class WordBombController {
 
         List<Word> pageList = (start > total) ? new ArrayList<>() : filtered.subList(start, end);
 
+
         // 3. 返回结构
         Map<String, Object> response = new HashMap<>();
         response.put("data", pageList);
@@ -123,6 +126,67 @@ public class WordBombController {
         response.put("totalPages", (int) Math.ceil((double) total / size));
         response.put("currentPage", page);
 
+        return response;
+    }
+
+
+    // 模拟你原有的获取整本书全量单词的方法，实际开发中替换成你从本地 json 读出来的全量 List
+    private List<Map<String, String>> mockLoadAllWordsFromBook(String bookName) {
+        // 这里对接你原本的词库加载逻辑，比如从 resources/kaoyan.json 读取全部单词
+        return new ArrayList<>();
+    }
+
+    /**
+     * 1. 核心大轰炸动态队列获取接口
+     */
+    @GetMapping("/getSmartQueue")
+    public List<Map<String, String>> getSmartQueue(@RequestParam String bookName) {
+        //List<Map<String, String>> allWords = mockLoadAllWordsFromBook(bookName);
+
+        List<Map<String, Object>> objectList = wordService.getStaticWordsByBook("kaoyan");
+        List<Map<String, String>> allWords = HelperUtil.convertToStringMapList(objectList);
+        // 调用 Service 生成科学分配的 20 个词
+        return wordService.generateSmartQueue(bookName, allWords, 20);
+    }
+
+    /**
+     * 2. 用户点击【掌握】时的状态推进接口
+     */
+    @PostMapping("/master")
+    public Map<String, String> masterWord(@RequestBody Map<String, String> payload) {
+        String bookName = payload.get("book");
+        String word = payload.get("word");
+
+        WordState ws = wordService.getOrInitWordState(bookName, word);
+
+        // 推进艾宾浩斯 CD
+        wordService.promoteWordCD(ws);
+        // 保存更新
+        wordService.updateWordState(bookName, ws);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("newState", ws.getStatus());
+        return response;
+    }
+
+    /**
+     * 3. 用户点击【陌生 / 翻车】时的惩罚打回接口
+     */
+    @PostMapping("/wrong")
+    public Map<String, String> wrongWord(@RequestBody Map<String, String> payload) {
+        String bookName = payload.get("book");
+        String word = payload.get("word");
+
+        WordState ws = wordService.getOrInitWordState(bookName, word);
+
+        // 执行魔鬼降级惩罚，直接打回突击营重修
+        wordService.punishWordToQueue(ws);
+        // 保存更新
+        wordService.updateWordState(bookName, ws);
+
+        Map<String, String> response = new HashMap<>();
+
+        response.put("newState", ws.getStatus());
         return response;
     }
 }

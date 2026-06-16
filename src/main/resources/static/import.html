@@ -58,7 +58,7 @@
             });
 
             async function commit() {
-                const res = await fetch('/api/batch-import', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parsed.value) });
+                const res = await fetch('/api/words/batch-import', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parsed.value) });
                 if((await res.json()).status === 'success') { alert("🎉 批量注入成功！"); text.value = ''; parsed.value = []; }
             }
             return { target, text, parsed, commit };

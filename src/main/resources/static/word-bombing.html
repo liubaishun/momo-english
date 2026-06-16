@@ -242,7 +242,7 @@
                 currentCategory.value = category;
                 resetMetrics();
                 try {
-                    const res = await fetch('/api/words');
+                    const res = await fetch('/api/import/words');
                     const all = await res.json();
                     rawServerWords.value = all.filter(w => w.category === category).sort(() => Math.random() - 0.5);
                     activeQueue.value = rawServerWords.value.slice(0, 300);

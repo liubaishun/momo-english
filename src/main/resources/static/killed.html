@@ -85,7 +85,7 @@
                     const [wordsRes, staticKilledRes, javaKilledRes] = await Promise.all([
                         fetch('words_data.json'),
                         fetch('killed_data.json').catch(() => null),
-                        fetch('http://localhost:8080/api/dynamic-killed').catch(() => null)
+                        fetch('http://localhost:8080/api/words/dynamic-killed').catch(() => null)
                     ]);
 
                     allStaticWords.value = await wordsRes.json();
@@ -109,7 +109,7 @@
             // 批量提交请求给 Java 后端回滚磁盘
             async function executeRestoreAPI(ids) {
                 try {
-                    const res = await fetch('http://localhost:8080/api/restore-word', {
+                    const res = await fetch('http://localhost:8080/api/words/restore-word', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ wordIds: ids })

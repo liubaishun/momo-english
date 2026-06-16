@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 转图片 Pro - 实时工作台</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* CSS 变量：核心画布全局样式 */
+        :root {
+            --bg-main: #0c0c0e;
+            --bg-card: rgba(22, 22, 26, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #e3e3e6;
+            --text-muted: #80868b;
+            --radius-main: 14px;
+
+            /* 默认 Gemini 科技蓝主题变量 */
+            --theme-accent: #a8c7fa;
+            --theme-glow: rgba(168, 199, 250, 0.15);
+            --theme-btn: linear-gradient(135deg, #3867d6, #4b7bec);
+        }
+
+        /* 赛博朋克主题 */
+        [data-theme="cyberpunk"] {
+            --theme-accent: #00f0ff;
+            --theme-glow: rgba(0, 240, 255, 0.2);
+            --theme-btn: linear-gradient(135deg, #f000ff, #00f0ff);
+        }
+
+        /* 极客矩阵黑客绿主题 */
+        [data-theme="matrix"] {
+            --theme-accent: #00ff66;
+            --theme-glow: rgba(0, 255, 102, 0.15);
+            --theme-btn: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: background 0.5s ease;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 顶部导航与控制面板 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2::before {
+            content: '';
+            width: 6px;
+            height: 22px;
+            background: var(--theme-accent);
+            border-radius: 4px;
+            box-shadow: 0 0 12px var(--theme-accent);
+            transition: all 0.3s;
+        }
+
+        /* 主题选择器集成样式 */
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .theme-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.03);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .theme-selector span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .theme-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .theme-dot.active { border-color: #fff; transform: scale(1.15); }
+        .dot-gemini { background: #3867d6; }
+        .dot-cyber { background: #00f0ff; }
+        .dot-matrix { background: #00ff66; }
+
+        /* 工作台双栏核心栅格 */
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        @media (min-width: 992px) {
+            .workspace { grid-template-columns: 1fr 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-main);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 20px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            height: 600px; /* 固定统一高度 */
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+            align-items: center;
+        }
+
+        /* 左侧：编辑器区域 */
+        textarea {
+            width: 100%;
+            flex: 1;
+            background: rgba(10, 10, 12, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #f1f1f4;
+            padding: 16px;
+            font-family: 'Consolas', 'Fira Code', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        textarea:focus {
+            border-color: var(--theme-accent);
+            box-shadow: 0 0 12px var(--theme-glow);
+        }
+
+        /* 右侧：渲染预览区 (带呼吸感边框模拟最终出图成片) */
+        .preview-body {
+            flex: 1;
+            background: rgba(10, 10, 12, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 24px;
+            overflow-y: auto;
+            border-left: 3px solid var(--theme-accent);
+            transition: border-color 0.3s;
+        }
+
+        /* Markdown 内置标签基础样式渲染渲染 */
+        .preview-body h1, .preview-body h2, .preview-body h3 {
+            color: var(--theme-accent);
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        .preview-body h1 { font-size: 1.6rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;}
+        .preview-body h2 { font-size: 1.3rem; }
+        .preview-body p { font-size: 0.95rem; line-height: 1.7; color: #d1d1d6; margin-bottom: 10px; }
+        .preview-body code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: var(--theme-accent); }
+        .preview-body pre { background: #1e1e24; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 10px 0; }
+        .preview-body ul, .preview-body ol { padding-left: 20px; margin-bottom: 10px; color: #d1d1d6; }
+        .preview-body blockquote { border-left: 4px solid var(--theme-accent); padding-left: 12px; color: var(--text-muted); font-style: italic; margin: 10px 0; }
+
+        /* 使得 Preview 中的 KaTeX 公式块能完美居中排版且不产生白块 */
+        .katex-display {
+            margin: 12px 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            color: var(--theme-accent);
+        }
+
+        /* 动作面板 */
+        .control-panel {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        button {
+            background: var(--theme-btn);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 28px;
+            height: 44px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 15px var(--theme-glow);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+            box-shadow: 0 6px 20px var(--theme-glow);
+        }
+
+        button:disabled { background: #2c2c30; color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast 提示 */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: rgba(46, 213, 115, 0.95); color: #fff; padding: 12px 24px;
+            border-radius: 24px; font-size: 0.9rem; opacity: 0; pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 9999;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header>
+        <div>
+            <h2>Markdown 智能工作台</h2>
+        </div>
+
+        <div class="toolbar-right">
+            <div class="theme-selector">
+                <span>渲染主题：</span>
+                <div class="theme-dot dot-gemini active" onclick="switchTheme('gemini')" title="Gemini 科技蓝"></div>
+                <div class="theme-dot dot-cyber" onclick="switchTheme('cyberpunk')" title="赛博朋克"></div>
+                <div class="theme-dot dot-matrix" onclick="switchTheme('matrix')" title="黑客矩阵"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="card">
+            <div class="card-header">
+                <span>MD 源码编辑器</span>
+                <span id="char-count">字数: 0</span>
+            </div>
+            <textarea id="md" placeholder="在此处键入您的 Markdown，右侧会实时完成渲染..." autocomplete="off" spellcheck="false"># 智能记忆算法技术大纲
+
+## 1. 核心公式与微循环延迟
+在滚动记忆模式下，将核心工作队列（Working Queue）保持在 $15 \sim 20$ 个单词最为科学：
+* **单行公式提取努力程度：** $E = mc^2 + \alpha$
+* **多行阵列滚动延迟：**
+$$
+T_{\text{circle}} = Q_{\text{size}} \times t_{\text{bomb}} = 20 \times 3s = 60s
+$$
+
+> 提示：1分钟的延迟，刚好让一个单词从大脑的“瞬时视觉留存”进入“短时提取阶段”，通过 $\mu\text{-SRS}$ 神经网络可以强化记忆神经元的建立。</textarea>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>高清卡片成片实时预览</span>
+                <span>画布格式: PNG</span>
+            </div>
+            <div id="preview" class="preview-body"></div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <button id="downloadBtn" onclick="downloadImage()">
+            <span class="spinner" id="btnSpinner"></span>
+            <span id="btnText">导出高清图片</span>
+        </button>
+    </div>
+</div>
+
+<div id="toast" class="toast">图片导出成功！</div>
+
+<script>
+    const mdInput = document.getElementById("md");
+    const previewDiv = document.getElementById("preview");
+    const charCount = document.getElementById("char-count");
+    let currentTheme = "gemini"; // 默认当前主题
+
+    // 1. 多模板主题切换控制
+    function switchTheme(themeName) {
+        currentTheme = themeName;
+        document.documentElement.setAttribute('data-theme', themeName);
+
+        // 更新小圆点高亮状态
+        document.querySelectorAll('.theme-dot').forEach(dot => {
+            dot.classList.remove('active');
+        });
+        const activeDot = document.querySelector(`.dot-${themeName.substring(0, 5)}`);
+        if (activeDot) activeDot.classList.add('active');
+    }
+
+    // 2. 纯前端 Markdown 实时解析与渲染逻辑
+    function renderMarkdown() {
+        let rawMarkdown = mdInput.value;
+        charCount.innerText = `字数: ${rawMarkdown.length}`;
+
+        // 先用 marked 解析基础语法
+        let htmlContent = marked.parse(rawMarkdown);
+
+        // 先把渲染好的 HTML 塞进预览区
+        previewDiv.innerHTML = htmlContent;
+
+        // 核心修复点：此时 renderMathInElement 已经有效，调用它自动解析预览区内的数学公式
+        if (typeof renderMathInElement === "function") {
+            renderMathInElement(previewDiv, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false // 防止错误的公式语法导致解析崩溃
+            });
+        }
+    }
+
+    // 3. 性能优化：引入防抖（Debounce），避免连续打字时解析造成页面卡顿
+    function debounce(fn, delay = 300) {
+        let timeout;
+        return function () {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn.apply(this, arguments), delay);
+        };
+    }
+
+    mdInput.addEventListener('input', debounce(renderMarkdown, 250));
+
+    // 4. 编辑器增强：允许使用 Tab 键缩进
+    mdInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+            renderMarkdown();
+        }
+    });
+
+    // Toast 控制
+    function showToast(message, isError = false) {
+        const toast = document.getElementById("toast");
+        toast.innerText = message;
+        toast.style.background = isError ? "rgba(235, 77, 75, 0.95)" : "rgba(46, 213, 115, 0.95)";
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2500);
+    }
+
+    // 5. 核心下载与后端请求逻辑（带上当前选中的主题参数）
+    async function downloadImage() {
+        const markdown = mdInput.value;
+        if (!markdown.trim()) {
+            showToast("请输入有效内容后再进行导出", true);
+            return;
+        }
+
+        const downloadBtn = document.getElementById("downloadBtn");
+        const btnSpinner = document.getElementById("btnSpinner");
+        const btnText = document.getElementById("btnText");
+
+        downloadBtn.disabled = true;
+        btnSpinner.style.display = "inline-block";
+        btnText.innerText = "后端渲染中...";
+
+        try {
+            // 在请求头中额外加入当前选中的“主题色名称”，方便后端动态调配底色和高亮色
+            let response = await fetch("/api/markdown/image", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "text/plain",
+                    "X-Render-Theme": currentTheme // 传给后端识别的主题参数
+                },
+                body: markdown
+            });
+
+            if (!response.ok) throw new Error("服务器生成失败");
+
+            let blob = await response.blob();
+            let url = window.URL.createObjectURL(blob);
+
+            let a = document.createElement("a");
+            a.href = url;
+            a.download = `md_render_${currentTheme}_${Date.now()}.png`;
+            a.click();
+
+            window.URL.revokeObjectURL(url);
+            showToast("高清卡片图片已成功下载！");
+
+        } catch (e) {
+            console.error(e);
+            showToast("导出失败，请检查后端服务连通性", true);
+        } finally {
+            downloadBtn.disabled = false;
+            btnSpinner.style.display = "none";
+            btnText.innerText = "导出高清图片";
+        }
+    }
+
+    // 初始化运行一次，渲染默认数据
+    renderMarkdown();
+</script>
+
+</body>
+</html>

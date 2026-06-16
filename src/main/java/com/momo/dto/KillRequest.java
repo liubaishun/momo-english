@@ -6,6 +6,7 @@ public class KillRequest {
     private String user;
     private String book;
     private String word;
+    private String status;   // 打分状态: hard, medium, easy
 
 
     public String getUser() {
@@ -30,5 +31,14 @@ public class KillRequest {
 
     public void setWord(String word) {
         this.word = word;
+    }
+
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

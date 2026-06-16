@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>单词过滤-极客本地全屏背词轰炸机 Pro</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css"/>
+    <script src="https://unpkg.com/element-plus"></script>
+
+    <style>
+        /* 🎨 核心主题：Gemini 原生极简暗黑调色盘 */
+        :root {
+            --bg-dark: #131314;         /* 系统纯净底色（极黑） */
+            --sidebar-bg: #1e1e20;      /* 侧边栏与卡片容器背景 */
+            --card-bg: #1e1e20;
+            --accent-color: #a8c7fa;    /* 标志性高亮微光蓝（用于掌握/选中/页码） */
+            --accent-danger: #ec928e;   /* 低饱和度战术斩杀红（用于未掌握/退出） */
+            --text-main: #e3e3e3;       /* 护眼主文字色 */
+            --text-muted: #8e918f;      /* 次要辅助灰 */
+            --border-color: #333537;    /* 细腻边框线 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "Google Sans", Roboto, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 🎬 模块 1：侧边栏丝滑折叠骨架 */
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.25s cubic-bezier(0.2, 0, 0, 1);
+            position: relative;
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: 0px;
+            border-right: none;
+        }
+
+        .sidebar-wrapper {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        /* 🔘 悬浮折叠按钮 */
+        .sidebar-toggle-btn {
+            position: absolute;
+            top: 12px;
+            left: 228px;
+            width: 40px;
+            height: 40px;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease, left 0.25s cubic-bezier(0.2, 0, 0, 1), color 0.2s;
+            outline: none;
+            z-index: 100;
+        }
+
+        body:has(.sidebar.collapsed) .sidebar-toggle-btn {
+            left: 12px;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background-color: rgba(227, 227, 227, 0.08);
+        }
+        .sidebar-toggle-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+        .book-select {
+            background: #282a2c;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            margin: 20px 16px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            width: calc(100% - 32px);
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        .book-select:focus { border-color: var(--accent-color); }
+
+        /* 🏛️ 模块 2：右侧主数据空间 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: var(--bg-dark);
+            position: relative;
+        }
+
+        /* 顶部导航控制栏 */
+        .top-navbar {
+            height: 64px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-left: 24px;
+            padding-right: 24px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            transition: padding-left 0.25s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        body:has(.sidebar.collapsed) .top-navbar {
+            padding-left: 64px;
+        }
+
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .current-book-title { font-size: 1.15rem; font-weight: 500; color: var(--text-main); white-space: nowrap; }
+
+        /* 胶囊控制按钮体系 */
+        .btn {
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-primary {
+            background: rgba(168, 199, 250, 0.1) !important;
+            color: var(--accent-color) !important;
+            border: 1px solid rgba(168, 199, 250, 0.3) !important;
+        }
+        .btn-primary:hover {
+            background: var(--accent-color) !important;
+            color: #131314 !important;
+            box-shadow: 0 1px 12px rgba(168, 199, 250, 0.3) !important;
+        }
+
+        .btn-secondary { background: #1e1e20; color: var(--text-main); }
+        .btn-secondary:hover { background: #2d2f31; border-color: #4a4d50; }
+
+        .btn-kbd {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: monospace;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            margin-left: 4px;
+        }
+
+        /* 📋 模块 3：数据表格与标签控制区 */
+        .tabs-container { display: flex; gap: 8px; padding: 12px 24px 0; background: var(--bg-dark); }
+        .tab-btn { padding: 8px 16px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.95rem; border-radius: 16px; transition: all 0.2s; outline: none;}
+        .tab-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+        .tab-btn.active { color: var(--accent-color); background: rgba(168, 199, 250, 0.1); font-weight: 500; }
+
+        /* 内容容器：给 flex: 1 让它吃满主区域剩余空间，并允许内容独立滚动 */
+        .content-body { flex: 1; padding: 0 24px 10px; overflow-y: auto; position: relative; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* 大纲/过滤列表的专业表格排版 */
+        .word-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+        .word-table th { padding: 14px 16px; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; text-align: left;}
+        .word-table td { padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid var(--border-color); }
+        .word-table tr:hover td { background: rgba(255,255,255,0.06); }
+
+        .col-word { width: 25%; font-weight: 600; color: #e0e0e0; font-size: 1.1rem; }
+        .col-phonetic { width: 20%; color: #7cc0ff; font-family: 'Consolas', monospace; }
+        .col-def { width: 45%; color: #aaa; line-height: 1.6; }
+        .col-action { width: 10%; text-align: right; }
+        .checkbox-cell { width: 50px; text-align: center; }
+
+        /* 📌 分页栏容器：使用 justify-content: center 实现优雅的全局居中 */
+        .pagination-container {
+            padding: 16px 24px;
+            background: var(--bg-dark);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        /* 🚀 模块 4：全屏应激背词大幕 */
+        .bomb-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #0f0f11;
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bomb-header-fixed {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 64px;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(19, 19, 20, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10005;
+        }
+
+        .bomb-word {
+            font-size: clamp(4rem, 9vw, 7.5rem);
+            white-space: nowrap;
+            font-weight: 400;
+            color: #f2f2f2;
+            margin-top: 40px;
+            margin-bottom: 8px;
+        }
+        .bomb-phonetic {
+            font-size: 2.2rem;
+            color: #7cc0ff;
+            margin-bottom: 16px;
+            font-family: "Lucida Sans Unicode", sans-serif;
+            height: 36px;
+        }
+
+        .bomb-trans {
+            font-size: 2rem;
+            color: var(--accent-color);
+            max-width: 80%;
+            text-align: center;
+            min-height: 80px;
+            height: auto;
+            visibility: hidden;
+            font-weight: 300;
+            line-height: 1.5;
+        }
+        .bomb-trans.show { visibility: visible; }
+
+        .bomb-progress-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: rgba(255, 255, 255, 0.03); }
+        .bomb-progress-bar { height: 100%; width: 0%; background: var(--accent-color); transition: width 0.2s ease; }
+
+        .bomb-status-center { display: flex; gap: 16px; align-items: center; font-size: 1rem; }
+        .badge-category { color: #f5b041; font-weight: 500; background: rgba(245,176,65,0.1); padding: 4px 12px; border-radius: 12px; }
+        .badge-count { color: var(--text-muted); }
+        .badge-mode { color: var(--accent-color); background: rgba(168,199,250,0.1); padding: 4px 12px; border-radius: 12px; }
+        .bomb-exit-btn { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 6px 16px; border-radius: 16px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+        .bomb-exit-btn:hover { background: rgba(255,255,255,0.05); border-color: #4a4d50; }
+
+        .bomb-header-right-zone { display: flex; align-items: center; gap: 16px; color: var(--text-muted); font-size: 0.95rem; }
+        .btn-setting-icon { background: transparent; border: none; color: var(--text-main); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: background-color 0.15s; }
+        .btn-setting-icon:hover { background-color: rgba(255,255,255,0.06); }
+
+        /* 🎯 模块 5：评分器组件 */
+        .bomb-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            padding: 15px;
+            background: rgba(19, 19, 20, 0.85);
+            backdrop-filter: blur(10px);
+        }
+
+        .bomb-grading-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin: 0 5px;
+        }
+
+        .btn-grade {
+            display: flex;
+            align-items: center;
+            height: 42px;
+            padding: 0 16px;
+            background: #1e1e20;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-content { display: flex; flex-direction: column; align-items: flex-start; margin-left: 8px; line-height: 1.2; }
+        .btn-icon { font-size: 1.1rem; }
+        .btn-text { font-size: 0.85rem; font-weight: 600; color: #e3e3e3; }
+        .btn-grade .btn-kbd { font-size: 0.65rem; padding: 0px 4px; border-radius: 3px; margin-top: 1px; border: none; min-width: 14px; text-align: center; }
+
+        .btn-stranger:hover { border-color: #ff4d4f; box-shadow: 0 0 12px rgba(255, 77, 79, 0.25); background: rgba(255, 77, 79, 0.05); }
+        .btn-stranger:hover .btn-text { color: #ff4d4f; }
+        .btn-stranger .btn-kbd { background: #3c1a1a; color: #ff7875; }
+
+        .btn-vague:hover { border-color: #ffa940; box-shadow: 0 0 12px rgba(255, 169, 64, 0.25); background: rgba(255, 169, 64, 0.05); }
+        .btn-vague:hover .btn-text { color: #ffa940; }
+        .btn-vague .btn-kbd { background: #3c281a; color: #ffc069; }
+
+        .btn-mastered { border: 1px solid rgba(168, 199, 250, 0.3); }
+        .btn-mastered:hover { border-color: #a8c7fa; box-shadow: 0 0 15px rgba(168, 199, 250, 0.35); background: rgba(168, 199, 250, 0.1); }
+        .btn-mastered .btn-text { color: #a8c7fa; }
+        .btn-mastered .btn-kbd { background: #a8c7fa; color: #131314; font-weight: bold; }
+
+        .bomb-controls .btn-exit-danger { background: rgba(236, 146, 142, 0.1) !important; color: var(--accent-danger) !important; border: 1px solid rgba(236, 146, 142, 0.3) !important; }
+        .bomb-controls .btn-exit-danger:hover { background: var(--accent-danger) !important; color: #131314 !important; }
+
+        /* 🧪 模块 6：Element Plus 组件重写（支持暗黑 Jumper 输入框适配） */
+        .el-pagination {
+            --el-pagination-button-bg-color: transparent !important;
+            --el-pagination-hover-color: #a8c7fa !important;
+            .el-pager li:not(.is-active) { color: #8e918f !important; background: transparent !important; border-radius: 6px; }
+            .el-pager li:not(.is-active):hover { color: #e3e3e3 !important; background: rgba(255, 255, 255, 0.08) !important; }
+            .el-pager li.is-active { background: rgba(168, 199, 250, 0.12) !important; color: #a8c7fa !important; border: 1px solid rgba(168, 199, 250, 0.3); border-radius: 6px; font-weight: 600; transform: scale(1.05); }
+            .btn-prev, .btn-next { color: #8e918f !important; background: transparent !important; }
+
+            /* Jumper (前往第X页) 暗黑风强制定制 */
+            .el-pagination__jump { color: var(--text-muted) !important; margin-left: 16px; }
+            .el-input__wrapper { background-color: #1e1e20 !important; box-shadow: 0 0 0 1px var(--border-color) inset !important; }
+            .el-input__inner { color: var(--text-main) !important; text-align: center; font-family: monospace; }
+            .el-input__wrapper.is-focus { box-shadow: 0 0 0 1px var(--accent-color) inset !important; }
+        }
+
+        .el-overlay { z-index: 100010 !important; }
+        .dark-dialog { background-color: #282a2c !important; border: 1px solid var(--border-color) !important; border-radius: 20px !important; box-shadow: 0 10px 40px rgba(0,0,0,0.5) !important; }
+        .dark-dialog .el-dialog__title { color: var(--text-main) !important; font-weight: 500; }
+        .dark-dialog .setting-item { margin-bottom: 25px; }
+        .dark-dialog .setting-label { font-size: 0.95rem; color: var(--text-main); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .dark-dialog .setting-value { color: var(--accent-color); font-weight: bold; font-family: monospace; font-size: 1.1rem; }
+        .dark-dialog .setting-desc { font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 6px; line-height: 1.4; }
+
+        .highlight-row { background: rgba(168, 199, 250, 0.15) !important; border-left: 3px solid #a8c7fa; transition: all 0.4s ease; }
+        .row-restore-anim { animation: slideInFromLeft 0.4s ease-out forwards; }
+        @keyframes slideInFromLeft { 0% { opacity: 0; transform: translateX(-20px); } 100% { opacity: 1; transform: translateX(0); } }
+        .book-badge { background: rgba(124, 192, 255, 0.1); color: var(--accent-color); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(124, 192, 255, 0.15); text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+<button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="切换侧边栏">
+    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+</button>
+
+<div id="app" style="display: contents;">
+
+    <div class="sidebar" id="sidebarNode">
+        <div class="sidebar-wrapper">
+            <div class="sidebar-header">
+                <span>📚 词书空间</span>
+                <a href="admin.html" class="flex items-center justify-center p-2 ml-auto rounded-lg text-slate-400 hover:text-indigo-400 transition" title="管理词库">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </a>
+            </div>
+            <select id="bookSelect" class="book-select" onchange="handleBookChange(this)">
+                <option value="">-- 请选择单词书 --</option>
+            </select>
+            <div style="margin-top: auto; font-size: 0.8rem; color: #444; text-align: center; font-family: monospace; letter-spacing: 1px; padding-bottom: 16px;">
+                ENGINE KERNEL V3.0<br>DESIGNED BY GEMINI
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-navbar">
+            <div class="nav-left" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span class="current-book-title" id="currentBookName">请选择单词书...</span>
+                    <div>
+                        <span class="book-badge" style="vertical-align: middle;">大纲核心库</span>
+                        <span style="margin-left: 20px; color: var(--text-muted); font-size: 0.95rem;">容纳战术核心词 <strong style="color: #fff; font-family: monospace; font-size:1.1rem;">{{ totalWordsCount }}</strong> 个</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="startBombBtn">🚀 开始全屏过滤</button>
+            </div>
+        </div>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('rawPanel', this)">📋 待过词表 (<span id="rawCount">0</span>)</button>
+            <button class="tab-btn" onclick="switchTab('killedPanel', this)">💎 熟悉词汇 (<span id="killedCount">0</span>)</button>
+        </div>
+
+        <div class="content-body">
+            <div id="rawPanel" class="panel active">
+                <table class="word-table">
+                    <thead>
+                    <tr>
+                        <th>单词 (Word)</th>
+                        <th>音标 (Phonetic)</th>
+                        <th>中文释义 (Translation)</th>
+                        <th style="text-align: right;">操作 (Action)</th>
+                    </tr>
+                    </thead>
+                    <tbody id="rawWordTableBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-muted);">
+                            请在左侧选择一本单词书开始
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="killedPanel" class="panel">
+                <div style="margin-top: 15px; margin-bottom: 15px; display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" id="batchRestoreBtn">🔄 批量还原选中词</button>
+                </div>
+                <table class="word-table">
+                    <thead>
+                    <tr>
+                        <th class="checkbox-cell"><input type="checkbox" id="selectAllKilled"></th>
+                        <th>单词 (Word)</th>
+                        <th>音标 (Phonetic)</th>
+                        <th>中文释义 (Translation)</th>
+                        <th>总过筛</th>
+                        <th>错误率</th>
+                        <th>斩杀时间</th>
+                        <th style="text-align: right;">操作 (Action)</th>
+                    </tr>
+                    </thead>
+                    <tbody id="killedWordTableBody">
+                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无已斩杀的熟词</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="pagination-container">
+            <el-pagination
+                    v-model:current-page="currentPage"
+                    v-model:page-size="pageSize"
+                    :page-sizes="[10, 20, 30, 50, 100, 200, 300]"
+                    layout="sizes, prev, pager, next, jumper, total"
+                    :total="rawTotalCount"
+                    @size-change="handleSizeChange"
+                    @current-change="handleCurrentChange"
+            />
+        </div>
+    </div>
+
+    <div class="bomb-overlay" id="bombOverlay">
+        <header class="bomb-header-fixed">
+            <button onclick="exitBomb()" class="bomb-exit-btn">◀ 退出过滤</button>
+            <div class="bomb-status-center">
+                <span class="badge-category" id="bombCategory">单词过滤</span>
+                <span class="badge-count" id="bombRemainingCount">剩余：0</span>
+                <span class="badge-mode mode-all" id="bombModeBadge">全量第一轮</span>
+            </div>
+            <div class="bomb-header-right-zone">
+                <div class="bomb-progress-right">
+                    扫描进度: <strong style="color:var(--text-main);" id="bombCurrentIndex">0</strong> / <span id="bombTotalCount">0</span>
+                </div>
+                <button class="btn-setting-icon" @click="openSettingDialog" title="战术节奏调整">⚙️</button>
+            </div>
+            <div class="bomb-progress-container">
+                <div class="bomb-progress-bar" id="bombProgressBar"></div>
+            </div>
+        </header>
+
+        <div class="bomb-word" id="bWord">Loading</div>
+        <div class="bomb-phonetic" id="bPhonetic">
+            [/]
+            <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>
+        </div>
+        <div class="bomb-trans" id="bTrans">翻译</div>
+
+        <div class="bomb-controls">
+            <button class="btn btn-secondary" onclick="bombPrev()">⏮️ 上一个<span class="btn-kbd">←</span></button>
+            <button class="btn btn-secondary" onclick="toggleAudio()" id="audioToggleBtn">🔊 语音: 开</button>
+            <button class="btn btn-secondary" onclick="toggleTrans()" id="transToggleBtn">👁️ 中文: 关<span class="btn-kbd">Q</span></button>
+            <button class="btn btn-secondary" onclick="toggleAutoMode()" id="autoModeBtn">🌀 开启自动滚动<span class="btn-kbd">Space</span></button>
+
+            <div class="bomb-grading-group">
+                <button class="btn btn-grade btn-stranger" onclick="bombGrade(0)">
+                    <span class="btn-icon">🌋</span>
+                    <div class="btn-content"><span class="btn-text">陌生</span><span class="btn-kbd">1</span></div>
+                </button>
+                <button class="btn btn-grade btn-vague" onclick="bombGrade(1)">
+                    <span class="btn-icon">⚡</span>
+                    <div class="btn-content"><span class="btn-text">模糊</span><span class="btn-kbd">2</span></div>
+                </button>
+                <button class="btn btn-grade btn-mastered" onclick="bombGrade(2)">
+                    <span class="btn-icon">💎</span>
+                    <div class="btn-content"><span class="btn-text">掌握</span><span class="btn-kbd">Enter</span></div>
+                </button>
+            </div>
+
+            <button class="btn btn-secondary" onclick="bombNext()">⏭️ 下一个<span class="btn-kbd">→</span></button>
+            <button class="btn btn-exit-danger" onclick="exitBomb()">❌ 退出过滤<span class="btn-kbd">ESC</span></button>
+        </div>
+    </div>
+
+    <el-dialog
+            v-model="settingVisible"
+            title="⚡ 轰炸机战术节奏调校面板"
+            width="460px"
+            class="dark-dialog"
+            :before-close="closeSettingDialog"
+            :append-to-body="true"
+            :z-index="100050"
+    >
+        <div class="setting-item">
+            <div class="setting-label">
+                <span>1. 【显英文】留白猜词时间</span>
+                <span class="setting-value">{{ englishBlurTime }} ms</span>
+            </div>
+            <el-slider v-model="englishBlurTime" :min="300" :max="5000" :step="100"/>
+            <span class="setting-desc">当屏幕切出纯英文时，留给大脑进行应激回忆的“真空时间”。</span>
+        </div>
+        <div class="setting-item">
+            <div class="setting-label">
+                <span>2. 【显中文】视觉最短留白时间</span>
+                <span class="setting-value">{{ chineseShowTime }} ms</span>
+            </div>
+            <el-slider v-model="chineseShowTime" :min="300" :max="5000" :step="100"/>
+            <span class="setting-desc">中文释义浮现后的最短停留卡点。倒计时结束后，轰炸机将自动强行切入下一个单词。</span>
+        </div>
+        <template #footer>
+                <span class="dialog-footer">
+                    <el-button type="primary" color="#a8c7fa" style="width:100%; font-weight:bold; height: 40px; font-size: 1rem; color:#131314;" @click="closeSettingDialog">
+                        锁定参数并返回
+                    </el-button>
+                </span>
+        </template>
+    </el-dialog>
+
+</div>
+
+
+<script>
+    const { createApp, ref } = Vue;
+
+    let isAutoMode = false;
+    let autoShowTrans = false;
+    let isAudioEnabled = true;
+    let autoLoopTimer = null;
+
+    const API_BASE = "http://localhost:8080/api/words";
+    let currentBookId = "";
+
+    // 核心数据队列
+    let burningWords = [];    // 【活跃队列】存放未满5次、处于滚动记忆状态的词
+    let frozenWords = [];     // 【熟词队列】存放已满5次、彻底冻结的熟词
+
+    const MAX_KILL_COUNT = 5; // 触发彻底冻结的斩杀阈值
+
+    let activeDisplayList = [];
+    let bombList = [];
+    let bombIndex = 0;
+
+    // 1. 在外部定义两个响应式引用，作为普通 JS 数组与 Vue 之间的桥梁
+    const rawBurningLength = Vue.ref(0);
+    const rawFrozenLength = Vue.ref(0);
+
+    const app = createApp({
+        setup() {
+            const currentPage = ref(1);
+            const pageSize = ref(20);
+            const rawTotalCount = ref(0);
+
+            const settingVisible = ref(false);
+            const englishBlurTime = ref(1500);
+            const chineseShowTime = ref(1000);
+
+            // 🎯【核心增加】：利用 computed 属性，自动计算并追踪两个数量的和
+           const totalWordsCount = Vue.computed(() => {
+              return rawBurningLength.value + rawFrozenLength.value;
+           });
+
+            const handleSizeChange = (val) => {
+                pageSize.value = val;
+                currentPage.value = 1;
+                renderMainTables();
+            };
+
+            const handleCurrentChange = (val) => {
+                currentPage.value = val;
+                renderMainTables();
+            };
+
+            const openSettingDialog = () => {
+                if (isAutoMode) {
+                    toggleAutoMode();
+                }
+                settingVisible.value = true;
+            };
+
+            const closeSettingDialog = () => {
+                settingVisible.value = false;
+            };
+
+            return {
+                currentPage, pageSize, rawTotalCount, handleSizeChange, handleCurrentChange,
+                settingVisible, englishBlurTime, chineseShowTime, openSettingDialog, closeSettingDialog,
+                totalWordsCount
+            };
+        }
+    });
+
+    app.use(ElementPlus);
+    const vm = app.mount('#app');
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebarNode');
+        sidebar.classList.toggle('collapsed');
+    }
+
+    // 🌟 【核心逻辑落地】战术打分与分流控制（已闭环去重）
+    async function bombGrade(level) {
+        if (bombList.length === 0 || bombIndex >= bombList.length) return;
+
+        // 强行清除自动滚动的定时器，防止手动干预后与自动流撞车
+        if (autoLoopTimer) {
+            clearTimeout(autoLoopTimer);
+            autoLoopTimer = null;
+        }
+
+        const wordEl = document.getElementById('bWord');
+        const colors = ['#ff4d4f', '#ffa940', '#42b983']; // 红（陌生）、橙（模糊）、绿（掌握）
+        if (wordEl) {
+            wordEl.style.transition = 'none';
+            wordEl.style.color = colors[level];
+            setTimeout(() => {
+                wordEl.style.transition = 'all 0.3s';
+                wordEl.style.color = '';
+            }, 150);
+        }
+
+        const currentWordObj = bombList[bombIndex];
+
+        switch(level) {
+            case 0: // 🌋 陌生：加入临近高频复习队列
+                console.log(`[${currentWordObj.word}] 标记为陌生：3步后闪回`);
+                // 后端静默同步
+                syncDifficultyWithServer(currentWordObj.word, 'hard');
+
+                // 战术插队：插到当前索引后第 3 个位置
+                const insertIndex = Math.min(bombIndex + 4, bombList.length);
+                bombList.splice(insertIndex, 0, { ...currentWordObj });
+
+                // 推进到下一词
+                bombNextReal();
+                break;
+
+            case 1: // ⚡ 模糊：本轮末尾重刷
+                console.log(`[${currentWordObj.word}] 标记为模糊：追加至队尾`);
+                // 后端静默同步
+                syncDifficultyWithServer(currentWordObj.word, 'medium');
+
+                // 追加到当前轰炸组的末尾
+                bombList.push({ ...currentWordObj });
+
+                // 推进到下一词
+                bombNextReal();
+                break;
+
+            case 2: // 💎 掌握：触发核心斩杀计数与过筛计算
+                console.log(`[${currentWordObj.word}] 标记为掌握：请求后端计算斩杀深度`);
+                await executeBombKill(currentWordObj);
+                break;
+        }
+    }
+
+    // 核心网络同步：全屏轰炸点击“掌握”
+    async function executeBombKill(wordObj) {
+        if (!wordObj.reviewCount) wordObj.reviewCount = 0;
+        wordObj.reviewCount += 1;
+
+        try {
+            const response = await fetch(`${API_BASE}/filter/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    book: currentBookId,
+                    word: wordObj.word,
+                    status: 'easy' // 标为掌握，后端自动加过筛并计错误率
+                })
+            });
+
+            if (!response.ok) throw new Error("同步失败");
+
+            const wordEl = document.getElementById('bWord');
+            if (wordEl) wordEl.style.color = '#42b983';
+
+            setTimeout(() => {
+                if (wordEl) wordEl.style.color = '#fff';
+
+                // 从当前的随机轰炸组里面剔除（本轮不再出现）
+                bombList.splice(bombIndex, 1);
+
+                // 越界安全防护
+                if (bombIndex >= bombList.length && bombList.length > 0) {
+                    bombIndex = bombList.length - 1;
+                }
+
+                if (bombList.length === 0) {
+                    isAutoMode = false;
+                    updateAutoBtnUI();
+                    alert("🌟 当前批次轰炸训练圆满结束！");
+                    exitBomb();
+                } else {
+                    if (isAutoMode) {
+                        executeAutoStep();
+                    } else {
+                        showBombWord();
+                        playCurrentWordAudio();
+                    }
+                }
+            }, 150);
+
+        } catch (e) {
+            console.error("斩杀同步错误:", e);
+            alert("⚠️ 网络异常：斩杀未成功同步至后台！");
+        }
+    }
+
+    // 辅助函数：静默同步 陌生/模糊 状态
+    async function syncDifficultyWithServer(word, difficulty) {
+        try {
+            await fetch(`${API_BASE}/filter/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    book: currentBookId,
+                    word: word,
+                    status: difficulty
+                })
+            });
+        } catch (e) {
+            console.error("静默同步难度失败:", e);
+        }
+    }
+
+    function playWordAudio(word) {
+        return new Promise((resolve) => {
+            if (!isAudioEnabled) return resolve();
+
+            const safeTimeout = setTimeout(() => {
+                resolve();
+            }, 2000);
+
+            try {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(word);
+                utter.lang = 'en-US';
+
+                utter.onend = () => {
+                    clearTimeout(safeTimeout);
+                    resolve();
+                };
+                utter.onerror = (err) => {
+                    clearTimeout(safeTimeout);
+                    resolve();
+                };
+                window.speechSynthesis.speak(utter);
+            } catch (e) {
+                clearTimeout(safeTimeout);
+                resolve();
+            }
+        });
+    }
+
+    // 🌟 【自动化引擎】
+    async function executeAutoStep() {
+        if (!isAutoMode) return;
+
+        if (autoLoopTimer) clearTimeout(autoLoopTimer);
+
+        if (bombIndex >= bombList.length) {
+            isAutoMode = false;
+            updateAutoBtnUI();
+            alert("🌟 本组训练完成！轰炸任务圆满结束。");
+            exitBomb();
+            return;
+        }
+
+        const current = bombList[bombIndex];
+
+        // 联动主列表
+        syncMainListHighlight(current.word);
+        const transEl = document.getElementById('bTrans');
+
+        document.getElementById('bWord').innerText = current.word;
+        document.getElementById('bPhonetic').innerHTML =
+            `[${current.phonetic || ''}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
+
+        transEl.classList.remove('show');
+        transEl.innerText = "";
+
+        updateBombHeaderUI();
+
+        if (isAudioEnabled) {
+            await playWordAudio(current.word);
+        }
+
+        // 阶段一：【显英文】留白猜词
+        autoLoopTimer = setTimeout(() => {
+            if (!isAutoMode) return;
+
+            if (autoShowTrans) {
+                transEl.innerHTML = formatDefinition(current.definition);
+                transEl.classList.add('show');
+            }
+
+            // 阶段二：【显中文】视觉最短留白
+            autoLoopTimer = setTimeout(() => {
+                if (!isAutoMode) return;
+                bombIndex++;
+                executeAutoStep();
+            }, vm.chineseShowTime);
+
+        }, vm.englishBlurTime);
+    }
+
+    // 联动主列表定位高亮
+    async function syncMainListHighlight(targetWord) {
+        const index = burningWords.findIndex(item => item.word === targetWord);
+        if (index === -1) return;
+
+        const targetPage = Math.floor(index / vm.pageSize) + 1;
+
+        if (vm.currentPage !== targetPage) {
+            vm.currentPage = targetPage;
+            renderMainTables();
+        }
+
+        setTimeout(() => {
+            const rowId = `row-raw-${targetWord}`;
+            const rowEl = document.getElementById(rowId);
+
+            document.querySelectorAll('.highlight-row').forEach(el => el.classList.remove('highlight-row'));
+
+            if (rowEl) {
+                rowEl.classList.add('highlight-row');
+                rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    }
+
+    function toggleAutoMode() {
+        if (vm.settingVisible) return;
+
+        isAutoMode = !isAutoMode;
+
+        if (!isAutoMode) {
+            if (autoLoopTimer) {
+                clearTimeout(autoLoopTimer);
+                autoLoopTimer = null;
+            }
+            if (isAudioEnabled) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        updateAutoBtnUI();
+        if (document.activeElement) document.activeElement.blur();
+
+        if (isAutoMode) {
+            executeAutoStep();
+        }
+    }
+
+    function updateAutoBtnUI() {
+        const btn = document.getElementById('autoModeBtn');
+        if (!btn) return;
+        if (isAutoMode) {
+            btn.innerText = "⏹️ 停止自动滚动";
+            btn.classList.add('active-loop');
+        } else {
+            btn.innerText = "🌀 开启自动滚动";
+            btn.classList.remove('active-loop');
+        }
+    }
+
+    function speakCurrentWord() {
+        const word = document.getElementById('bWord').innerText.trim();
+        if (!word || word === "Loading") return;
+
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(word);
+        msg.lang = 'en-US';
+        msg.rate = 0.9;
+        window.speechSynthesis.speak(msg);
+    }
+
+    function toggleAudio() {
+        isAudioEnabled = !isAudioEnabled;
+        document.getElementById('audioToggleBtn').innerText = isAudioEnabled ? "🔊 语音: 开" : "🔇 语音: 关";
+
+        if (!isAudioEnabled) {
+            window.speechSynthesis.cancel();
+        } else {
+            if (bombList.length > 0 && bombIndex < bombList.length) {
+                playWordAudio(bombList[bombIndex].word);
+            }
+        }
+    }
+
+    function toggleTrans() {
+        autoShowTrans = !autoShowTrans;
+        document.getElementById('transToggleBtn').innerText = autoShowTrans ? "👁️ 中文: 开" : "🙈 中文: 关";
+
+        if (document.getElementById('bombOverlay').style.display === 'flex') {
+            const transEl = document.getElementById('bTrans');
+            if (autoShowTrans) {
+                transEl.innerHTML = formatDefinition(bombList[bombIndex].definition);
+                transEl.classList.add('show');
+            } else {
+                transEl.classList.remove('show');
+            }
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const res = await fetch(`${API_BASE}/import/books`);
+            const books = await res.json();
+            const select = document.getElementById('bookSelect');
+
+            select.innerHTML = '<option value="">-- 请选择单词书 --</option>' +
+                books.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+
+            if (books && books.length > 0) {
+                const firstBook = books[0];
+                select.value = firstBook.id;
+                await selectBook(firstBook.id, firstBook.name);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("无法连接到Java本地后台，请确认Spring Boot已启动！");
+        }
+
+        document.getElementById('startBombBtn').addEventListener('click', startWordBomb);
+        document.getElementById('selectAllKilled').addEventListener('change', (e) => {
+            const cbs = document.querySelectorAll('.killed-cb');
+            cbs.forEach(cb => cb.checked = e.target.checked);
+        });
+        document.getElementById('batchRestoreBtn').addEventListener('click', batchRestore);
+        window.addEventListener('keydown', handleGlobalKeydown);
+    });
+
+    async function selectBook(bookId, bookName) {
+        currentBookId = bookId;
+        const titleEl = document.getElementById('currentBookName');
+        if (titleEl) titleEl.innerText = bookName;
+
+        try {
+            // 通过 status 路由分流加载数据
+            const [resBurning, resFrozen] = await Promise.all([
+                fetch(`${API_BASE}/list?book=${bookId}&status=BURNING`).then(r => r.json()),
+                fetch(`${API_BASE}/list?book=${bookId}&status=FROZEN`).then(r => r.json())
+            ]);
+
+            burningWords = resBurning;
+            frozenWords = resFrozen;
+
+            // 获取词书全量大底（用于进度跳转锚定判断）
+            allWords = [...burningWords, ...frozenWords];
+
+            vm.currentPage = 1;
+            renderMainTables();
+        } catch (e) {
+            console.error("加载词书数据失败", e);
+        }
+    }
+
+    function handleBookChange(selectElement) {
+        const bookId = selectElement.value;
+        const bookName = selectElement.options[selectElement.selectedIndex].text;
+
+        if (document.getElementById('bombOverlay').style.display === 'flex') {
+            exitBomb();
+        }
+
+        if (bookId) selectBook(bookId, bookName);
+    }
+
+    function renderMainTables() {
+
+    // 🎯【关键同步行】：每次刷新表格或数据变动时，强行把原生 JS 数组长度塞给 Vue
+    rawBurningLength.value = burningWords ? burningWords.length : 0;
+    rawFrozenLength.value = frozenWords ? frozenWords.length : 0;
+        if (!currentBookId) return;
+
+        // 1. 计算活跃词的分页
+        const totalCount = burningWords.length;
+        const curPage = vm.currentPage;
+        const size = vm.pageSize;
+        const totalPages = Math.ceil(totalCount / size) || 1;
+        let safePage = Math.max(1, Math.min(curPage, totalPages));
+        const start = (safePage - 1) * size;
+
+        activeDisplayList = burningWords.slice(start, start + size);
+
+        vm.rawTotalCount = totalCount;
+        vm.currentPage = safePage;
+
+        document.getElementById('rawCount').innerText = totalCount;
+        document.getElementById('killedCount').innerText = frozenWords.length;
+
+        // 2. 渲染【待过词汇表】
+        const rawTbody = document.getElementById('rawWordTableBody');
+        if (activeDisplayList.length === 0) {
+            rawTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">🎉 这一段全部斩杀完毕或没有数据！</td></tr>`;
+        } else {
+            rawTbody.innerHTML = activeDisplayList.map(item => {
+                const count = item.reviewCount || 0;
+                const progressStr = "█".repeat(count) + "░".repeat(MAX_KILL_COUNT - count);
+
+                return `
+                    <tr id="row-raw-${item.word}">
+                        <td class="col-word">
+                            ${item.word}
+                            <span style="font-size:0.75rem; color:var(--accent-color); margin-left:8px; font-family:monospace;">
+                                ${progressStr} ${count}/5
+                            </span>
+                        </td>
+                        <td class="col-phonetic">
+                            ${item.phonetic || ''}
+                            <span onclick="playWordAudio('${item.word}')" style="cursor:pointer; margin-left:8px;">🔊</span>
+                        </td>
+                        <td class="col-def">${item.definition}</td>
+                        <td class="col-action">
+                           <button class="btn-action btn-kill" onclick="tableSingleKill('${item.word}')">
+                              ✓ 斩杀 +1
+                           </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 3. 渲染【已斩杀熟词表】（完美对接 8 列大表表头）
+        const killedTbody = document.getElementById('killedWordTableBody');
+        if (frozenWords.length === 0) {
+            killedTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无被斩杀的熟词</td></tr>`;
+        } else {
+            killedTbody.innerHTML = frozenWords.map(item => {
+                const frozenDate = item.lastReview ? new Date(item.lastReview).toLocaleString() : '未知';
+                const badgeColor = item.errorRate === '0%' ? '#42b983' : '#ffa940';
+
+                return `
+                    <tr>
+                        <td class="checkbox-cell"><input type="checkbox" class="killed-cb" value="${item.word}"></td>
+                        <td style="font-weight:500; color:var(--text-muted); text-decoration: line-through;">${item.word}</td>
+                        <td>${item.phonetic || ''}</td>
+                        <td>${item.definition}</td>
+                        <td style="font-family: monospace;">${item.totalCount || 0} 次</td>
+                        <td>
+                            <span style="color: ${badgeColor}; font-weight: bold; font-family: monospace;">
+                                ${item.errorRate || '0%'}
+                            </span>
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem; font-family: monospace;">${frozenDate}</td>
+                        <td style="text-align:right;">
+                            <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;" onclick="singleRestore('${item.word}')">打回重刷</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    function switchTab(panelId, btnEl) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        btnEl.classList.add('active');
+    }
+
+    // 列表手动点击斩杀 +1
+    async function tableSingleKill(word) {
+        const row = document.getElementById(`row-raw-${word}`);
+        if (row) {
+            row.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+            row.style.opacity = "0.5";
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/filter/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                      book: currentBookId,
+                      word: word,
+                      status: 'easy',
+                      source: 'list' // ⚡ 注入来源特征：明确告诉后端这是由“列表点击”触发的战术动作
+                })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            // 静默拉取刷新
+            const [resBurning, resFrozen] = await Promise.all([
+                fetch(`${API_BASE}/list?book=${currentBookId}&status=BURNING`).then(r => r.json()),
+                fetch(`${API_BASE}/list?book=${currentBookId}&status=FROZEN`).then(r => r.json())
+            ]);
+            burningWords = resBurning;
+            frozenWords = resFrozen;
+            renderMainTables();
+        } catch (e) {
+            console.error("单项斩杀失败:", e);
+            if (row) row.style.opacity = "1";
+            alert("⚠️ 斩杀同步失败，请检查网络！");
+        }
+    }
+
+    async function singleRestore(word) {
+        try {
+            await fetch(`${API_BASE}/filter/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book: currentBookId, words: [word] })
+            });
+
+            // 重新刷新双队列
+            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function batchRestore() {
+        const checkedBoxes = document.querySelectorAll('.killed-cb:checked');
+        if (checkedBoxes.length === 0) return alert("请先勾选你要踢回滚动的单词！");
+
+        const wordsToRestore = Array.from(checkedBoxes).map(cb => cb.value);
+
+        try {
+            const response = await fetch(`${API_BASE}/filter/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book: currentBookId, words: wordsToRestore })
+            });
+            if (!response.ok) throw new Error('Server error');
+
+            document.getElementById('selectAllKilled').checked = false;
+            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
+        } catch (e) {
+            console.error("批量还原失败:", e);
+            alert("⚠️ 批量还原同步失败，请检查网络！");
+        }
+    }
+
+    async function startWordBomb() {
+        if (activeDisplayList.length === 0) return alert("当前选择的列表中无待背单词！");
+
+        let targetWord = null;
+
+        try {
+            const res = await fetch(`${API_BASE}/progress/load?bookId=${currentBookId}`);
+            const progressData = await res.json();
+            if (progressData && progressData.lastWord) {
+                targetWord = progressData.lastWord;
+            }
+        } catch (e) {
+            console.warn("读取进度失败，从当前页开始", e);
+        }
+
+        if (targetWord) {
+            const index = burningWords.findIndex(item => item.word === targetWord);
+            if (index !== -1) {
+                const pageOfWord = Math.floor(index / vm.pageSize) + 1;
+                if (pageOfWord !== vm.currentPage) {
+                    if (confirm(`检测到上次背到了“${targetWord}”（在第 ${pageOfWord} 页），是否跳转至该页继续？`)) {
+                        vm.currentPage = pageOfWord;
+                        renderMainTables();
+                    }
+                }
+            }
+        }
+
+        const foundIndex = activeDisplayList.findIndex(item => item.word === targetWord);
+        // 随机打散当前分页列表
+        bombList = [...activeDisplayList].sort(() => Math.random() - 0.5);
+        bombIndex = (foundIndex !== -1) ? foundIndex : 0;
+
+        document.getElementById('bombOverlay').style.display = 'flex';
+        showBombWord(false);
+        updateBombHeaderUI();
+
+        if (isAutoMode) {
+            executeAutoStep();
+        }
+    }
+
+    function showBombWord(autoSpeak = true) {
+        if (bombIndex < 0) bombIndex = 0;
+        if (bombIndex >= bombList.length) {
+            if (isAutoMode) {
+                isAutoMode = false;
+                updateAutoBtnUI();
+            }
+            alert("🌟 恭喜！当前批次轰炸任务圆满完成！");
+            exitBomb();
+            return;
+        }
+
+        const current = bombList[bombIndex];
+        document.getElementById('bWord').innerText = current.word;
+        document.getElementById('bPhonetic').innerHTML =
+            `[${current.phonetic || ''}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
+        document.getElementById('bTrans').innerHTML = formatDefinition(current.definition);
+
+        if (autoSpeak) {
+            speakCurrentWord();
+        }
+
+        const transEl = document.getElementById('bTrans');
+        if (autoShowTrans) {
+            transEl.classList.add('show');
+        } else {
+            transEl.classList.remove('show');
+        }
+
+        updateBombHeaderUI();
+    }
+
+    function updateBombHeaderUI() {
+        const selectEl = document.getElementById('bookSelect');
+        const currentBookName = selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex].text : "未知词书";
+        document.getElementById('bombCategory').innerText = currentBookName;
+
+        const total = bombList.length;
+        document.getElementById('bombRemainingCount').innerText = `剩余：${total - bombIndex}`;
+        document.getElementById('bombCurrentIndex').innerText = total > 0 ? bombIndex + 1 : 0;
+        document.getElementById('bombTotalCount').innerText = total;
+
+        const progressPercent = total > 0 ? Math.round(((bombIndex + 1) / total) * 100) : 0;
+        const bar = document.getElementById('bombProgressBar');
+        if (bar) bar.style.width = progressPercent + '%';
+    }
+
+    function playCurrentWordAudio() {
+        if (bombList.length === 0 || bombIndex >= bombList.length) return;
+        const current = bombList[bombIndex];
+        if (current) playWordAudio(current.word);
+    }
+
+    function bombNextReal() {
+        if (bombIndex < bombList.length - 1) {
+            bombIndex++;
+            if (isAutoMode) {
+                executeAutoStep();
+            } else {
+                showBombWord();
+                playCurrentWordAudio();
+            }
+        } else {
+            isAutoMode = false;
+            updateAutoBtnUI();
+            alert("🌟 当前批次轰炸任务圆满完成！");
+            exitBomb();
+        }
+    }
+
+    function bombNext() {
+        if (autoLoopTimer) clearTimeout(autoLoopTimer);
+        bombNextReal();
+    }
+
+    function bombPrev() {
+        if (autoLoopTimer) clearTimeout(autoLoopTimer);
+        if (bombIndex > 0) {
+            bombIndex--;
+            if (isAutoMode) {
+                executeAutoStep();
+            } else {
+                showBombWord();
+                playCurrentWordAudio();
+            }
+        }
+    }
+
+    function formatDefinition(def) {
+        if (!def) return "";
+        return def.replace(/(vt\.|vi\.|n\.|adj\.|adv\.|prep\.|conj\.|interj\.)/g, '<br>$1').trim();
+    }
+
+    async function saveProgressToBackend() {
+        if (!currentBookId) return;
+        const currentWord = bombList[bombIndex] ? bombList[bombIndex].word : null;
+        const payload = {
+            bookId: currentBookId,
+            lastWord: currentWord
+        };
+        try {
+            await fetch(`${API_BASE}/progress/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            console.log("进度已同步到后端:", payload);
+        } catch (e) {
+            console.error("保存进度失败:", e);
+        }
+    }
+
+    function exitBomb() {
+        saveProgressToBackend();
+
+        isAutoMode = false;
+        updateAutoBtnUI();
+        if (autoLoopTimer) {
+            clearTimeout(autoLoopTimer);
+            autoLoopTimer = null;
+        }
+        window.speechSynthesis.cancel();
+        document.getElementById('bombOverlay').style.display = 'none';
+
+        // 强力拉取最新列表，同步过筛率数据
+        if (currentBookId) {
+            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
+        }
+    }
+
+    function handleGlobalKeydown(e) {
+        if (vm.settingVisible) return;
+
+        const overlay = document.getElementById('bombOverlay');
+        if (overlay.style.display !== 'flex') return;
+
+        if (e.code === 'Space') {
+            e.preventDefault();
+            toggleAutoMode();
+            return;
+        }
+
+        if (e.key === '1') {
+            e.preventDefault();
+            bombGrade(0); // 🌋 陌生
+            return;
+        } else if (e.key === '2') {
+            e.preventDefault();
+            bombGrade(1); // ⚡ 模糊
+            return;
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            bombGrade(2); // 💎 掌握 -> 直接走最新的统一过筛斩杀逻辑
+            return;
+        }
+
+        switch (e.code) {
+            case 'KeyQ':
+                e.preventDefault();
+                toggleTrans();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                if (!isAutoMode) bombPrev();
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                if (!isAutoMode) bombNext();
+                break;
+            case 'Escape':
+                e.preventDefault();
+                exitBomb();
+                break;
+        }
+    }
+</script>
+
+</body>
+</html>

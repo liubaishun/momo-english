@@ -1,8 +1,5 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<a href="index.html" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium">
-    返回背词前台 →
-</a>
 <head>
     <meta charset="UTF-8">
     <title>本地墨墨 - 词库管理后台</title>
@@ -40,29 +37,114 @@
         </div>
 
         <div class="lg:col-span-2 space-y-4">
-            <div class="flex space-x-2 bg-slate-100 p-1 rounded-xl w-fit text-sm">
-                <button v-for="t in ['全部', '中考', '高考', '考研']" @click="tab = t" :class="['px-4 py-2 rounded-lg font-bold transition', tab === t ? 'bg-white text-indigo-600 shadow-sm':'text-slate-500']">{{t}}</button>
+            <div class="flex justify-between items-center flex-wrap gap-2">
+                <div class="flex space-x-2 bg-slate-100 p-1 rounded-xl w-fit text-sm">
+                    <button v-for="t in ['全部', '中考', '高考', '考研']" @click="changeTab(t)" :class="['px-4 py-2 rounded-lg font-bold transition', tab === t ? 'bg-white text-indigo-600 shadow-sm':'text-slate-500']">{{t}}</button>
+                </div>
+                <div class="text-xs text-slate-500 flex items-center space-x-1.5">
+                    <span>每页显示</span>
+                    <select v-model="pageSize" @change="currentPage = 1" class="p-1 border rounded bg-white outline-none">
+                        <option :value="10">10 条</option>
+                        <option :value="20">20 条</option>
+                        <option :value="50">50 条</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="border rounded-2xl overflow-hidden bg-white">
-                <table class="w-full text-left text-sm border-collapse">
+            <div class="border rounded-2xl overflow-hidden bg-white shadow-sm">
+                <table class="w-full text-left text-sm border-collapse table-fixed">
                     <thead>
                     <tr class="bg-slate-50 border-b text-slate-400 text-xs font-bold">
-                        <th class="p-3 pl-5">单词信息</th>
-                        <th class="p-3">词书分类</th>
-                        <th class="p-3">核心释义及例句</th>
-                        <th class="p-3 text-center">操作</th>
+                        <th class="p-3 pl-5 w-[28%]">单词信息</th>
+                        <th class="p-3 w-[18%]">词书分类</th>
+                        <th class="p-3 w-[36%]">核心释义及例句</th>
+                        <th class="p-3 text-center w-[18%]">操作</th>
                     </tr>
                     </thead>
                     <tbody class="divide-y text-slate-700">
-                    <tr v-for="w in filtered" :key="w.id" class="hover:bg-slate-50/50 transition">
-                        <td class="p-3 pl-5"><strong class="text-slate-900 text-base">{{w.word}}</strong><p class="text-xs text-slate-400">/{{w.phonetic}}/</p></td>
-                        <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-600">{{w.category}}</span></td>
-                        <td class="p-3 max-w-xs"><div class="truncate font-medium">{{w.definition}}</div><div class="text-xs text-slate-400 italic truncate mt-0.5">{{w.example}}</div></td>
-                        <td class="p-3 text-center"><button @click="remove(w.id)" class="text-xs font-bold text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100 transition">删除</button></td>
+                    <tr v-for="w in paginatedList" :key="w.id" class="hover:bg-slate-50/50 transition">
+                        <td class="p-3 pl-5">
+                            <div v-if="editingId === w.id" class="space-y-1 pr-2">
+                                <input v-model="editForm.word" type="text" class="w-full px-2 py-1 border rounded-lg text-sm font-bold border-indigo-400 outline-none">
+                                <input v-model="editForm.phonetic" type="text" class="w-full px-2 py-1 border rounded-lg text-xs text-slate-400 outline-none">
+                            </div>
+                            <div v-else>
+                                <strong class="text-slate-900 text-base block truncate">{{w.word}}</strong>
+                                <p class="text-xs text-slate-400 truncate">/{{w.phonetic}}/</p>
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <div v-if="editingId === w.id">
+                                <select v-model="editForm.category" class="px-2 py-1 border rounded-lg text-xs font-bold bg-white border-indigo-400 outline-none">
+                                    <option value="中考">中考</option>
+                                    <option value="高考">高考</option>
+                                    <option value="考研">考研</option>
+                                </select>
+                            </div>
+                            <div v-else>
+                                <span class="px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-600">{{w.category}}</span>
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <div v-if="editingId === w.id" class="space-y-1 pr-2">
+                                <input v-model="editForm.definition" type="text" class="w-full px-2 py-1 border rounded-lg text-sm border-indigo-400 outline-none">
+                                <input v-model="editForm.example" type="text" class="w-full px-2 py-1 border rounded-lg text-xs text-slate-400 outline-none">
+                            </div>
+                            <div v-else>
+                                <div class="truncate font-medium text-slate-800" :title="w.definition">{{w.definition}}</div>
+                                <div class="text-xs text-slate-400 italic truncate mt-0.5" :title="w.example">{{w.example || '暂无经典例句'}}</div>
+                            </div>
+                        </td>
+                        <td class="p-3 text-center">
+                            <div v-if="editingId === w.id" class="flex justify-center space-x-1">
+                                <button @click="saveEdit(w.id)" class="text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg transition shadow-sm">保存</button>
+                                <button @click="cancelEdit" class="text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg transition">取消</button>
+                            </div>
+                            <div v-else class="flex justify-center space-x-1">
+                                <button @click="startEdit(w)" class="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-indigo-100 transition">编辑</button>
+                                <button @click="remove(w.id)" class="text-xs font-bold text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100 transition">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="filteredList.length === 0">
+                        <td colspan="4" class="p-8 text-center text-slate-400">该分类下暂无数据</td>
                     </tr>
                     </tbody>
                 </table>
+
+                <div v-if="filteredList.length > 0" class="px-5 py-3 bg-slate-50 border-t flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-slate-500">
+                    <div>
+                        共 <span class="font-bold text-slate-700">{{ filteredList.length }}</span> 条数据，当前第 <span class="font-bold text-indigo-600">{{ currentPage }}</span> / {{ totalPages }} 页
+                    </div>
+
+                    <div class="flex items-center space-x-4 flex-wrap gap-y-2">
+                        <div class="flex items-center space-x-1">
+                            <button @click="prevPage" :disabled="currentPage === 1" class="px-2.5 py-1.5 rounded-lg border bg-white font-medium hover:bg-slate-100 transition disabled:opacity-40 disabled:hover:bg-white select-none">◀</button>
+
+                            <button v-for="page in totalPages" :key="page"
+                                    v-show="Math.abs(page - currentPage) < 3 || page === 1 || page === totalPages"
+                                    @click="currentPage = page"
+                                    :class="['px-3 py-1.5 rounded-lg font-bold border transition select-none', currentPage === page ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white hover:bg-slate-100 text-slate-600']">
+                                {{ page }}
+                            </button>
+
+                            <button @click="nextPage" :disabled="currentPage === totalPages" class="px-2.5 py-1.5 rounded-lg border bg-white font-medium hover:bg-slate-100 transition disabled:opacity-40 disabled:hover:bg-white select-none">▶</button>
+                        </div>
+
+                        <div class="flex items-center space-x-1 border-l pl-4 border-slate-200">
+                            <span>跳至</span>
+                            <input v-model.lazy="jumpPageInput"
+                                   @keyup.enter="jumpToPage"
+                                   type="text"
+                                   placeholder="页码"
+                                   class="w-12 p-1 text-center border rounded-lg bg-white outline-none focus:border-indigo-500 text-slate-800 font-bold text-xs"
+                            >
+                            <span>页</span>
+                            <button @click="jumpToPage" class="px-2 py-1 bg-slate-200 hover:bg-indigo-600 hover:text-white rounded-md text-xs font-bold text-slate-600 transition">确定</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -72,27 +154,139 @@
     const { createApp, ref, computed, onMounted } = Vue;
     createApp({
         setup() {
-            const list = ref([]); const tab = ref('全部');
+            const list = ref([]);
+            const tab = ref('全部');
             const form = ref({ word:'', phonetic:'', definition:'', example:'', category:'中考' });
 
-            const load = async () => { const res = await fetch('/api/words'); list.value = await res.json(); };
+            // 行内编辑状态
+            const editingId = ref(null);
+            const editForm = ref({ word:'', phonetic:'', definition:'', example:'', category:'' });
+
+            // 分页核心响应式变量
+            const currentPage = ref(1);
+            const pageSize = ref(10);
+
+            // 🌟 战术卡点：专门用来绑定输入框的响应式变量
+            const jumpPageInput = ref('');
+
+            // 加载服务器数据
+            const load = async () => {
+                const res = await fetch('/api/words/import/words');
+                list.value = await res.json();
+            };
             onMounted(load);
 
-            const filtered = computed(() => tab.value === '全部' ? list.value : list.value.filter(w => w.category === tab.value));
+            // 分类级过滤
+            const filteredList = computed(() => {
+                return tab.value === '全部' ? list.value : list.value.filter(w => w.category === tab.value);
+            });
 
+            // 计算总页数
+            const totalPages = computed(() => {
+                return Math.ceil(filteredList.value.length / pageSize.value) || 1;
+            });
+
+            // 获取切片分页数组
+            const paginatedList = computed(() => {
+                const start = (currentPage.value - 1) * pageSize.value;
+                const end = start + pageSize.value;
+                return filteredList.value.slice(start, end);
+            });
+
+            // 🌟 强制精准跳转逻辑（核心安全守卫）
+            function jumpToPage() {
+                // 1. 将输入的字符串强制转为纯十进制整数
+                const targetPage = parseInt(jumpPageInput.value, 10);
+
+                // 2. 防爆验证：如果输入的不是纯数字、或者小于 1，直接拉回第 1 页
+                if (isNaN(targetPage) || targetPage < 1) {
+                    currentPage.value = 1;
+                }
+                // 3. 安全验证：如果输入的数字超出了当前分类的最大总页数，直接死死按在最后一页
+                else if (targetPage > totalPages.value) {
+                    currentPage.value = totalPages.value;
+                }
+                // 4. 合法页码，允许通行精准空降
+                else {
+                    currentPage.value = targetPage;
+                }
+
+                // 3. 动作完毕后清空输入框，保持界面干净
+                jumpPageInput.value = '';
+                cancelEdit(); // 顺手关闭多余的编辑锁定
+            }
+
+            // 切换 Tab 分类
+            function changeTab(targetTab) {
+                tab.value = targetTab;
+                currentPage.value = 1;
+                jumpPageInput.value = ''; // 切换词书分类时，顺手清空非活跃跳页输入
+                cancelEdit();
+            }
+
+            function prevPage() { if(currentPage.value > 1) currentPage.value--; }
+            function nextPage() { if(currentPage.value < totalPages.value) currentPage.value++; }
+
+            // 新词录入
             async function submit() {
                 if(!form.value.word || !form.value.definition) return alert("请补全单词与释义！");
-                const res = await fetch('/api/words', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(form.value) });
-                if((await res.json()).status === 'success') { load(); form.value = { word:'', phonetic:'', definition:'', example:'', category:form.value.category }; }
+                const res = await fetch('/api/words/import/words', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(form.value) });
+                if((await res.json()).status === 'success') {
+                    load();
+                    form.value = { word:'', phonetic:'', definition:'', example:'', category:form.value.category };
+                }
             }
 
+            // 单条删除
             async function remove(id) {
                 if(!confirm("确定要删除吗？")) return;
-                const res = await fetch(`/api/words/${id}`, { method:'DELETE' });
-                if((await res.json()).status === 'success') load();
+                const res = await fetch(`/api/words/words/${id}`, { method:'DELETE' });
+                if((await res.json()).status === 'success') {
+                    load();
+                    setTimeout(() => {
+                        if (currentPage.value > totalPages.value) {
+                            currentPage.value = totalPages.value;
+                        }
+                    }, 50);
+                }
             }
 
-            return { list, tab, form, filtered, submit, remove };
+            function startEdit(wordObj) {
+                editingId.value = wordObj.id;
+                editForm.value = { ...wordObj };
+            }
+
+            function cancelEdit() {
+                editingId.value = null;
+                editForm.value = { word:'', phonetic:'', definition:'', example:'', category:'' };
+            }
+
+            async function saveEdit(id) {
+                if(!editForm.value.word || !editForm.value.definition) return alert("单词和释义绝对不能为空！");
+                try {
+                    const res = await fetch('/api/words/import/words/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: id, ...editForm.value })
+                    });
+                    const result = await res.json();
+                    if(result.status === 'success' || result.code === 200) {
+                        editingId.value = null;
+                        load();
+                    } else {
+                        alert("保存失败：" + (result.message || "未知错误"));
+                    }
+                } catch(e) {
+                    console.error(e);
+                    alert("本地 Java 服务器异常！");
+                }
+            }
+
+            return {
+                list, tab, form, editingId, editForm, currentPage, pageSize, jumpPageInput,
+                filteredList, totalPages, paginatedList,
+                changeTab, prevPage, nextPage, submit, remove, startEdit, cancelEdit, saveEdit, jumpToPage
+            };
         }
     }).mount('#admin-app');
 </script>
