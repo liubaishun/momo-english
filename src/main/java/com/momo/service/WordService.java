@@ -4,7 +4,9 @@ package com.momo.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.momo.dto.KillRequest;
+import com.momo.dto.WordKillProjection;
 import com.momo.dto.WordVO;
+import com.momo.model.Difficulty;
 import com.momo.model.Word;
 import com.momo.model.WordDetailDTO;
 import com.momo.model.WordRelation;
@@ -147,8 +149,6 @@ public class WordService {
     }
 
 
-
-
     public void importToDatabase(List<Word> words) {
         // JPA 的 saveAll 在大数据量下性能较差，因为它是逐个执行 persist/merge
         // 建议分批处理，每批清理持久化上下文以节省内存
@@ -162,80 +162,6 @@ public class WordService {
                 // ((EntityManager) entityManager).clear();
             }
         }
-    }
-
-    public List<WordDetailDTO> getWordsByStatus(String bookId, String status) {
-        List<Object[]> results = wordRelationRepository.findWordsByBookAndStatusRaw(bookId, status);
-
-
-        return  results.stream().map(obj -> new WordDetailDTO(
-                (String) obj[0],  // word
-                (String) obj[1],  // phonetic
-                (String) obj[2],  // definition
-                ((Number) obj[3]).intValue(), // reviewCount (处理可能的 BigDecimal/Long)
-                (String) obj[4],  // status
-                (String) obj[5],  // difficulty
-                obj[6] != null ? ((Number) obj[6]).longValue() : null // lastReview
-        )).collect(Collectors.toList());
-
-    }
-
-
-    public List<WordVO> getWordsByBookAndStatus(String bookId, String status) {
-        // 1. 从 Repository 获取原生打平的数据
-        List<Object[]> rawList = wordRelationRepository.findWordsByBookAndStatusRaw(bookId, status);
-        List<WordVO> voList = new ArrayList<>();
-
-        // 2. 遍历并动态计算战术指标
-        for (Object[] row : rawList) {
-            WordVO vo = new WordVO();
-            vo.setWord((String) row[0]);
-            vo.setPhonetic((String) row[1]);
-            vo.setDefinition((String) row[2]);
-
-            // 索引 3: reviewCount
-            int reviewCount = row[3] != null ? ((Number) row[3]).intValue() : 0;
-            vo.setReviewCount(reviewCount);
-
-            // 索引 4: wrongCount (新增字段)
-            int wrongCount = row[4] != null ? ((Number) row[4]).intValue() : 0;
-
-            // 索引 5: status
-            vo.setStatus((String) row[5]);
-
-            // 索引 6: difficulty
-            vo.setDifficulty((String) row[6]);
-
-            // 索引 7: lastReview
-            vo.setLastReview(row[7] != null ? ((Number) row[7]).longValue() : null);
-
-            // 计算总数和错误率
-            int totalCount = reviewCount + wrongCount;
-            vo.setTotalCount(totalCount);
-
-            if (totalCount == 0) {
-                vo.setErrorRate("0%");
-            } else {
-                double rate = (wrongCount * 100.0) / totalCount;
-                vo.setErrorRate(String.format("%.1f%%", rate));
-            }
-
-            voList.add(vo);
-        }
-
-//        WordVO wordVO = new WordVO();
-//        wordVO.setWord("abandon");
-//        wordVO.setPhonetic("/əˈbændən/");
-//        wordVO.setDefinition("vt. 放弃，遗弃");
-//        wordVO.setDifficulty("easy");
-//        wordVO.setStatus("BURNING");
-//        wordVO.setTotalCount(8);
-//        wordVO.setErrorRate("37.5%");
-//        wordVO.setStatus("BURNING");
-//        wordVO.setLastReview(System.currentTimeMillis());
-//        voList.add(wordVO);
-
-        return voList;
     }
 
 
@@ -261,116 +187,8 @@ public class WordService {
     }
 
 
-    /**
-     * 🛰️ 战术核心 1：处理 /filter/kill 接口（清洗、分拣与滚动斩杀）
-     *
-     *
-     *                       [ 接收请求 /filter/kill ]
-     *                                |
-     *                    [ 查询或创建 WordRelation 记录 ]
-     *                                |
-     *                      { 判定请求来源 source }
-     *                                |
-     *               +----------------+----------------+
-     *               | (source == "list")              | (else / null / "bomb")
-     *               v                                 v
-     *       【 通道一：列表首次分拣 】         【 通道二：常规全屏大轰炸 】
-     *               |                                 |
-     *       +-------+-------+                 +-------+-------+
-     *       |               |                 | 'easy'        | 'wrong'
-     *   (mastered)       (vague)              v               v
-     *    直接冻结       留存燃烧区       [reviewCount +1]   [wrongCount +1]
-     *   Count = 5       Count = 2             |             状态保持 BURNING
-     *   DIFFICULTY:     DIFFICULTY:    { reviewCount >= 5? }
-     *   INIT_MASTERED   INIT_VAGUE            |
-     *                                +--------+--------+
-     *                                | 是              | 否
-     *                                v                 v
-     *                         [ 晋级 FROZEN ]    [ 保持 BURNING ]
-     *                                |
-     *                         【 动态难度打标 】
-     *                         - wrongs == 0 -> SMOOTH_KILL
-     *                         - wrongs <= 3 -> NORMAL_KILL
-     *                         - wrongs >  3 -> HARD_KILL
-     *
-     *
-     */
-    @Transactional
-    public void processWordReview(String bookId, String word, String userStatus, String source) {
-        // 1. 寻找已有记录，没有则当场初始化入舱（新词首次触碰）
-        WordRelation record = wordRelationRepository.findByBookIdAndWord(bookId, word)
-                .orElseGet(() -> {
-                    WordRelation newRecord = new WordRelation();
-                    newRecord.setBookId(bookId);
-                    newRecord.setWord(word);
-                    newRecord.setReviewCount(0);
-                    newRecord.setWrongCount(0);
-                    newRecord.setStatus("BURNING"); // 默认扔进燃烧区
-                    return newRecord;
-                });
 
-        // 确保各种 Count 字段不为 null，增强健壮性
-        int currentReviewCount = record.getReviewCount() != null ? record.getReviewCount() : 0;
-        int currentWrongCount = record.getWrongCount() != null ? record.getWrongCount() : 0;
 
-        // 🧭 通道一：来自“列表手动分拣”（系统初始化首次清洗）
-        if ("list".equals(source)) {
-            switch (userStatus) {
-                case "mastered": // 【初始化 - 掌握】
-                    record.setStatus("FROZEN");
-                    record.setReviewCount(5);   // 次数一步顶满
-                    record.setDifficulty("INIT_MASTERED");
-                    break;
-
-                case "vague":    // 【初始化 - 模糊】
-                    record.setStatus("BURNING");
-                    record.setReviewCount(2);   // 赠送 2 次起步分，轰炸机里再对 3 次即可通关
-                    record.setDifficulty("INIT_VAGUE");
-                    break;
-
-                case "stranger": // 【初始化 - 陌生】
-                default:
-                    record.setStatus("BURNING");
-                    record.setReviewCount(0);   // 次数归零，铁血重训
-                    record.setDifficulty("INIT_STRANGER");
-                    break;
-            }
-        }
-        // 🌋 通道二：来自“全屏视觉大轰炸”的常规滚动滚动
-        else {
-            if ("easy".equals(userStatus)) {
-                int newReviewCount = currentReviewCount + 1;
-                record.setReviewCount(newReviewCount);
-
-                // 🎯 触发通关生死线判定（满 5 次）
-                if (newReviewCount >= 5) {
-                    record.setStatus("FROZEN"); // 晋升冻结舱熟词
-
-                    // 🧠 终极进化：根据在这本书中犯错的次数，动态结算该词的血烈程度
-                    if (currentWrongCount == 0) {
-                        record.setDifficulty("SMOOTH_KILL"); // 顺畅斩杀（一次没错，极高熟练度）
-                    } else if (currentWrongCount <= 3) {
-                        record.setDifficulty("NORMAL_KILL"); // 常规斩杀（轻微波动）
-                    } else {
-                        record.setDifficulty("HARD_KILL");   // 惨烈斩杀（硬骨头，未来需高频抽查）
-                    }
-                } else {
-                    record.setStatus("BURNING"); // 没满 5 次，继续在燃烧区受训
-                }
-            }
-            else if ("wrong".equals(userStatus)) {
-                // 吃到马枪，错词率累加，打回大轰炸池队列尾部
-                record.setWrongCount(currentWrongCount + 1);
-                record.setStatus("BURNING");
-            }
-        }
-
-        // 刷新最后触碰/复习的时间戳
-        record.setLastReview(System.currentTimeMillis());
-
-        // 持久化落地
-        wordRelationRepository.save(record);
-    }
 
     public WordRelation getRecord(String bookId, String word) {
         if (bookId == null || word == null) {
@@ -407,42 +225,49 @@ public class WordService {
      * @param words  需要打回的单词列表
      */
     @Transactional
-    public void restoreWords(String bookId, List<String> words) {
+    public void restoreWords(String bookId, List<String> words, String source) {
         if (words == null || words.isEmpty()) {
             return; // 战术空检，防止空指针
         }
-
         long currentTime = System.currentTimeMillis();
-
-        // ⚡ 核心演进：地毯式循环遍历处理每一个要回炉的单词
+        // ⚡ 地毯式循环遍历处理每一个要回炉的单词
         for (String word : words) {
-            // 1. 查询记忆关联记录
             Optional<WordRelation> relationOpt = wordRelationRepository.findByBookIdAndWord(bookId, word);
-
             if (relationOpt.isPresent()) {
                 WordRelation record = relationOpt.get();
+                // 🧭 通道一：来自“过滤页面（filterPage）”的误触撤销
+                if ("filterPage".equals(source)) {
+                    record.setStatus("BURNING");
+                    record.setReviewCount(0);
+                    record.setWrongCount(0);      // 手滑误触，干净重置，不计入错词大盘
+                    record.setDifficulty(null);   // 身份抹除，彻底回归未分流新词池（A面）
+                    System.out.println("【过滤撤销】单词 [" + word + "] 已抹除标记，完美回归待过词表新词池。");
+                }
 
-                // 2. 铁血状态降级：从冻结舱蒸发，强制扔回燃烧区火力网
-                record.setStatus("BURNING");
+                // 🌋 通道二：来自“极致斩杀页面（killPage）”的铁血打回（融合你原有的硬核逻辑）
+                else if ("killPage".equals(source)) {
+                    // 1. 强制扔回燃烧区火力网
+                    record.setStatus("BURNING");
 
-                // 3. 计数器清洗复位
-                record.setReviewCount(0); // 记忆退化，通关计数全额清零，必须重新在大轰炸里积满 5 次
+                    // 2. 记忆退化惩罚：血条全额清零，必须在斩杀页重新积满 5 次
+                    record.setReviewCount(0);
 
-                int currentWrongCount = record.getWrongCount() != null ? record.getWrongCount() : 0;
-                record.setWrongCount(currentWrongCount + 1); // 再次遭遇遗忘，错词记录加 1
+                    // 3. 再次遭遇遗忘：错词记录铁血加 1
+                    int currentWrongCount = record.getWrongCount() != null ? record.getWrongCount() : 0;
+                    record.setWrongCount(currentWrongCount + 1);
 
-                // 4. 身份重塑：统一改名为“二战回炉攻坚词”
-                record.setDifficulty("RESTORED");
+                    // 4. 身份重塑：打上你原汁原味的二战回炉标签
+                    record.setDifficulty(Difficulty.KILL_RECOUP.name());
 
-                // 5. 刷新最后触碰时间戳
+                    System.out.println("【斩杀打回】单词 [" + word + "] 遭遇遗忘，血条清零且 wrongCount+1，打上 [KILL_RECOUP] 标签！");
+                }
+
+                // 5. 统一刷新最后触碰时间戳并持久化
                 record.setLastReview(currentTime);
-
-                // 6. 持久化保存
                 wordRelationRepository.save(record);
 
-                System.out.println("【战术打回】单词 [" + word + "] 已成功降级为 BURNING，打上 [RESTORED] 标签！");
             } else {
-                // 边缘防御：如果数据库根本没有这个词的记录，打印警告，跳过（不破坏整个批量队列的连续性）
+                // 边缘防御：未找到关联记录则自动跳过
                 System.err.println("【打回警告】未找到书籍 " + bookId + " 中单词 [" + word + "] 的关联记录，自动跳过。");
             }
         }

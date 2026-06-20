@@ -26,72 +26,85 @@ public class WordRelation {
 
     private String word;
 
+    private int streak;         // 突击大循环中连续正确计数器 (0-3，满3次在前端物理剔除)
+
+    /**
+     * 当前复习周期的“斩杀血条”
+     * 范围：0 ~ 5 (MAX_KILL_COUNT)
+     * 行为：单次会话中每按一次 Easy/掌握 加 1 分，满 5 分直接物理飞升进入 FROZEN 状态
+     */
     @Column(name = "review_count")
     private Integer reviewCount = 0;
 
+
+    /**
+     * 全局累计错词次数（审计计数器）
+     * 行为：【只增不减】，只要在轰炸机界面点错一次，终身累加 1
+     * 战术价值：用于后期大数据盘点，精准揪出欺骗性最强的顽固死角词
+     */
+    private Integer totalWrongCount;
+
+
+
+    /**
+     * 本期错词次数（生命周期计数器）
+     * 触发时机：
+     * 1. 当单词初次导入、从 FROZEN 解冻、或手动回炉时，该字段【立刻清零(0)】。
+     * 2. 在轰炸机界面每答错一次，该值加 1。
+     * 战术价值：在 reviewCount == 5 触发毕业的瞬间，后端依据此字段的值，
+     * 将身份动态擦除并重写为 SMOOTH_KILL / NORMAL_KILL / HARD_KILL。
+     */
     @Column(name = "wrong_count")
     private Integer wrongCount = 0;
 
+
+    /*
+    status (String): 单词的物理隔离区。
+    BURNING（燃烧区/活跃）：单词当前正在被用户死磕，或处于轰炸机的候选池中。
+    FROZEN（冷冻区/归档）：单词已经通关，移出高频轰炸队列，进入复习大盘。
+    reviewCount (Integer): 当前周期的“斩杀血条”。
+    范围是 0 到 5。每按一次 Easy 加 1 分，满 5 分直接物理飞升进入 FROZEN 状态。
+     */
     private String status = "BURNING";
 
-    /**
-     * difficulty 字段不再是一个静态的“死标签”，而是一个记录单词“出身背景”与“血烈程度”的战术指针。它的取值可以分为两大阵营：
-     *
-     * 阵营 A：初始化清洗出身（初次分拣）
-     * 当数据状态为 FROZEN 或 BURNING，且 difficulty 属于这一组时，说明它们是第一天导入时被分拣出来的。
-     *
-     * INIT_MASTERED（初始化-掌握）：
-     *
-     * 含义：用户在第一天看列表时，一眼认出并直接秒杀的熟词。
-     *
-     * 数据状态：status = 'FROZEN', review_count = 5。
-     *
-     * 战术价值：这类词熟练度最高，未来做“周期性破冰复习”时，可以把它们的复习延迟到 60~90 天以后。
-     *
-     * INIT_VAGUE（初始化-模糊）：
-     *
-     * 含义：用户第一天分拣时觉得“似懂非懂”的词。
-     *
-     * 数据状态：status = 'BURNING', review_count = 2。
-     *
-     * 战术价值：轰炸机拉取时，它们带有 2 次基础分，只需要在轰炸机里再对 3 次就能通关。
-     *
-     * INIT_STRANGER（初始化-陌生）：
-     *
-     * 含义：第一天分拣时用户承认完全不会的词。
-     *
-     * 数据状态：status = 'BURNING', review_count = 0。
-     *
-     * 战术价值：纯新词、死穴词。轰炸机引擎可以对这类词进行加权高频曝光。
-     *
-     *
-     *
-     *
-     * 阵营 B：轰炸机百炼成钢（常规斩杀通关）
-     * 当单词在全屏大轰炸中老老实实挺过 5 次 easy 通关，在进入 FROZEN 状态的瞬间，后端根据它在这个过程中的错词次数（wrongCount）进行复盘，动态赋予以下三个标签之一：
-     *
-     * SMOOTH_KILL（顺畅斩杀）：
-     *
-     * 含义：在轰炸机浮现的历程中，一次都没有错过（wrong_count == 0），直接打满 5 次通关。
-     *
-     * 战术价值：属于用户的潜在高熟练度词汇，短期内绝对不会忘，遗忘复习周期可设为 30 天。
-     *
-     * NORMAL_KILL（常规斩杀）：
-     *
-     * 含义：在轰炸机里错过，但错得不多（例如 0 < wrong_count <= 3），属于正常记忆波动的词。
-     *
-     * 战术价值：中等熟练度，维持艾宾浩斯经典记忆曲线复习。
-     *
-     * HARD_KILL（惨烈斩杀）：
-     *
-     * 含义：硬骨头、顽固死角！虽然最终达到了 5 次 easy 进入了冻结舱，但在背它的过程中，反复被点过马枪打回燃烧区很多次（wrong_count > 3）。
-     *
-     * 战术价值：极度危险词！ 哪怕它现在进了熟词表（FROZEN），用户大概率也是短期强行记住的，极易遗忘。算法应当在 3~5 天内，强行将它再次激活拉进大轰炸进行巩固。
-     */
+
     private String difficulty;
 
+    @Column(name = "difficulty_aa")
+    private double difficultyAa;
+
+
+    /**
+     * 上次复习/斩杀时间
+     */
     @Column(name = "last_review")
     private Long lastReview;
+
+
+    private Integer totalCount; // 总过筛次数（掌握次数 + 错误次数）
+
+
+
+
+
+
+    // === 5. 遗忘对抗终极指标 ===
+    /**
+     * 熟悉深度（斩杀通关计数器）
+     * 行为：每次在轰炸机或主表里【连续秒杀】或【顺利通关一组】，该值 +1
+     * 触发线：只有当 familiarDepth >= 5 时，状态才允许从 "BURNING" 转为 "FROZEN" (真正冻结)
+     */
+    private Integer familiarDepth = 0;
+
+    private double stability = 2.0;          // 2. 记忆稳定度 (Stability, 单位：天，初始生词给2天)
+
+    private Long sessionLastActiveTime;
+
+
+
+    // ... 保留你原有的 getter/setter ...
+    public Integer getFamiliarDepth() { return familiarDepth != null ? familiarDepth : 0; }
+    public void setFamiliarDepth(Integer familiarDepth) { this.familiarDepth = familiarDepth; }
 
 
     public Long getId() {
@@ -156,5 +169,53 @@ public class WordRelation {
 
     public void setLastReview(Long lastReview) {
         this.lastReview = lastReview;
+    }
+
+    public Integer getTotalWrongCount() {
+        return totalWrongCount;
+    }
+
+    public void setTotalWrongCount(Integer totalWrongCount) {
+        this.totalWrongCount = totalWrongCount;
+    }
+
+    public Integer getTotalCount() {
+        return totalCount;
+    }
+
+    public void setTotalCount(Integer totalCount) {
+        this.totalCount = totalCount;
+    }
+
+    public int getStreak() {
+        return streak;
+    }
+
+    public void setStreak(int streak) {
+        this.streak = streak;
+    }
+
+    public double getStability() {
+        return stability;
+    }
+
+    public void setStability(double stability) {
+        this.stability = stability;
+    }
+
+    public double getDifficultyAa() {
+        return difficultyAa;
+    }
+
+    public void setDifficultyAa(double difficultyAa) {
+        this.difficultyAa = difficultyAa;
+    }
+
+    public Long getSessionLastActiveTime() {
+        return sessionLastActiveTime;
+    }
+
+    public void setSessionLastActiveTime(Long sessionLastActiveTime) {
+        this.sessionLastActiveTime = sessionLastActiveTime;
     }
 }

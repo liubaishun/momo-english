@@ -204,7 +204,6 @@ public class ImportWordController {
                 w.setBookId("kaoyan"); // 显式设置默认状态
                 currentWords.add(w);
             }
-            saveToFile(currentWords);
             wordService.importToDatabase(currentWords);
             response.put("status", "success");
             response.put("count", newWords.size());

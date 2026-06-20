@@ -1,8 +1,10 @@
 package com.momo.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.momo.dto.WordVO;
+import com.momo.service.WordKillService;
 import com.momo.service.WordService;
+import com.momo.service.strategy.RollingRefuelEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +26,11 @@ public class KilledWordController {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
-    private WordService wordService;
+    private WordService wordService;    @Autowired
+    private RollingRefuelEngine refuelEngine;
+
+    @Autowired
+    private WordKillService wordKillService;
 
 
     // 动态斩杀单词的本地存储路径
@@ -43,139 +49,88 @@ public class KilledWordController {
         }
     }
 
-
-    // 接收进度保存请求
-    @PostMapping("/progress/save")
-    public void saveProgress(@RequestBody Map<String, Object> progress) throws Exception {
-        String bookId = (String) progress.get("bookId");
-        String lastWord = (String) progress.get("lastWord"); // 允许它为 null
-
-        // ⚡ 只强校验词书 ID 不能为空
-        if (bookId == null || bookId.trim().isEmpty()) {
-            throw new IllegalArgumentException("词书ID参数缺失");
-        }
-
-        File file = new File(DATA_PATH + bookId + "_progress.json");
-
-        // 直接写入。即便 {"bookId":"xxx", "lastWord":null} 也是完全合法的 JSON 格式
-        mapper.writeValue(file, progress);
-    }
-
-    // 获取上次进度
-    @GetMapping("/progress/load")
-    public Map<String, Object> loadProgress(@RequestParam String bookId) throws Exception {
-        File file = new File(DATA_PATH + bookId + "_progress.json");
-
-        // ⚡ 核心修复：检查文件是否存在，且长度是否大于 0
-        if (!file.exists() || file.length() == 0) {
-            return new HashMap<>(); // 返回一个空的 Map，前端解析后就是一个 {}
-        }
-
-        try {
-            return mapper.readValue(file, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (Exception e) {
-            // 如果文件虽然有内容但格式错误，记录日志并返回空 Map
-            System.err.println("进度文件解析失败: " + e.getMessage());
-            return new HashMap<>();
-        }
-    }
-
-
     /**
-     * 接口 1：获取后端动态斩杀的全部单词 ID 列表
-     * GET http://localhost:8080/api/dynamic-killed
+     * 💎 斩杀页面双大盘数据拉取端点
+     * GET /api/words/kill/list?bookId=xxxx&status=BURNING (拉取待背词表)
+     * GET /api/words/kill/list?bookId=xxxx&status=FROZEN  (拉取已背词表)
      */
-    @GetMapping("/dynamic-killed")
-    public ResponseEntity<Map<String, Object>> getDynamicKilled() {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            List<Integer> killedIds = readKilledIdsFromFile();
-            response.put("success", true);
-            response.put("killedIds", killedIds);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "读取后端库失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
+    @GetMapping("/kill/list")
+    public ResponseEntity<List<WordVO>> getKillPageList(@RequestParam("bookId") String bookId, @RequestParam("status") String status) {
+        if (bookId == null || status == null) {
+            return ResponseEntity.badRequest().build();
         }
+        List<WordVO> list = wordKillService.getKillPageWords(bookId, status);
+
+        return ResponseEntity.ok(list);
     }
 
     /**
-     * 接口 2：动态斩杀新单词（追加到本地库）
-     * POST http://localhost:8080/api/kill-word
-     * Body: { "wordId": 105 }
+     * 🛰️ 对应前端：刷新并加载当前词书的轰炸混编大盘
+     * GET /api/word/bomb/load?bookId=xxx
      */
-    @PostMapping("/kill-word")
-    public ResponseEntity<Map<String, Object>> killWord(@RequestBody Map<String, Object> payload) {
-        Map<String, Object> response = new HashMap<>();
-        if (!payload.containsKey("wordId")) {
-            response.put("success", false);
-            response.put("message", "缺少 wordId");
-            return ResponseEntity.badRequest().body(response);
+    @GetMapping("/bomb/load")
+    public ResponseEntity<List<WordVO>> loadBombQueue(@RequestParam("bookId") String bookId, @RequestParam(value = "status", required = false, defaultValue = "BURNING")String status) {
+        if (bookId == null || status == null) {
+            return ResponseEntity.badRequest().build();
         }
 
-        try {
-            int wordId = Integer.parseInt(payload.get("wordId").toString());
-            List<Integer> killedIds = readKilledIdsFromFile();
+        List<WordVO> list = wordKillService.getKillPageWords(bookId, status);
 
-            if (!killedIds.contains(wordId)) {
-                killedIds.add(wordId);
-                writeKilledIdsToFile(killedIds);
-            }
+        //List<WordVO> activeQueue = wordKillService.calculateEightDimensionalBombMagazine(list);
+        List<WordVO> activeQueue = refuelEngine.memoryStatePredictionEngine(list,bookId);
 
-            response.put("success", true);
-            response.put("message", "单词已成功持久化写入 Java 后端库");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "操作失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        return ResponseEntity.ok(activeQueue);
     }
 
     /**
-     * 接口 3：批量/单个从动态库中移除并还原单词
-     * POST http://localhost:8080/api/words/restore-word
-     * Body: { "wordIds": [105, 106, 107] }
+     * 4. 斩杀单个单词（按书隔离，并记录难度分层）
+     * 列表手动点击是为了“对刚导入的单词进行快速分拣，标记陌生、模糊、掌握”。
+     * 此时用户在列表上的点击，本质上是在进行首次身份定义，而不是普通的复习滚动。
      */
-    @PostMapping("/restore-word")
-    public ResponseEntity<Map<String, Object>> restoreWord(@RequestBody Map<String, List<Integer>> payload) {
-        Map<String, Object> response = new HashMap<>();
-        if (!payload.containsKey("wordIds")) {
-            response.put("success", false);
-            response.put("message", "参数错误，必须包含 wordIds 数组");
-            return ResponseEntity.badRequest().body(response);
+    @PostMapping("/kill/kill")
+    public Map<String, String> killWord(@RequestBody Map<String, Object> payload) {
+        String bookId = (String) payload.get("book");
+        String word = (String) payload.get("word");
+        String masteryDegree = (String) payload.getOrDefault("status", "mastered");
+        String source = (String) payload.get("source");
+
+        // 调用 Service 处理
+        wordKillService.processWordReview(bookId, word, masteryDegree, source);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("message", "成功处理单词: " + word);
+        return result;
+    }
+
+
+
+    /**
+     * 📥 5. 取消斩杀/还原单个或多个单词（从冻结舱踢回燃烧区）
+     */
+    @PostMapping("/kill/restore")
+    @SuppressWarnings("unchecked")
+    public Map<String, String> restoreWords(@RequestBody Map<String, Object> payload) {
+        String bookId = (String) payload.get("book"); // 战术统一：建议变量名与前端一致用 bookId 或 book
+        List<String> words = (List<String>) payload.get("words");
+
+        // 🎯 新增：获取前端传来的还原来源，默认兜底为 killPage
+        String source = (String) payload.getOrDefault("source", "killPage");
+
+        Map<String, String> result = new HashMap<>();
+
+        if (bookId == null || words == null || words.isEmpty()) {
+            result.put("status", "failed");
+            result.put("message", "还原失败：缺少核心参数！");
+            return result;
         }
 
-        try {
-            List<Integer> targetsToRestore = payload.get("wordIds");
-            List<Integer> killedIds = readKilledIdsFromFile();
+        // 交付 Service 层，并将 source 战术下发
+        wordService.restoreWords(bookId, words, source);
 
-            // 过滤掉需要还原的 ID
-            killedIds.removeIf(targetsToRestore::contains);
-            writeKilledIdsToFile(killedIds);
-
-            response.put("success", true);
-            response.put("message", "成功复活并从 Java 后端库中移除");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "操作失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        result.put("status", "success");
+        result.put("message", "成功处理 " + words.size() + " 个单词的还原请求");
+        return result;
     }
 
-    // 读取本地存储文件的私有工具方法
-    private synchronized List<Integer> readKilledIdsFromFile() throws IOException {
-        File file = new File(FILE_PATH);
-        return objectMapper.readValue(file, new TypeReference<List<Integer>>() {
-        });
-    }
-
-    // 写入本地存储文件的私有工具方法
-    private synchronized void writeKilledIdsToFile(List<Integer> killedIds) throws IOException {
-        File file = new File(FILE_PATH);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, killedIds);
-    }
 }
