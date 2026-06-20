@@ -591,6 +591,9 @@
 <script>
     const { createApp, ref, computed } = Vue;
 
+    // =========================================================================
+    // 🪐 绝对时空全场核心状态机变量
+    // =========================================================================
     let isAutoMode = false;
     let autoShowTrans = false;
     let isAudioEnabled = true;
@@ -600,6 +603,16 @@
     let bombEndTimeStamp = null;
 
     let autoLoopTimer = null;
+    // =========================================================================
+    // 🚀 核心定时器控制：强行挂载至全局 window，防止 HTML 节点调用产生未定义报错
+    // =========================================================================
+    window.clearAutoTimer = function() {
+    if (autoLoopTimer) {
+        clearTimeout(autoLoopTimer);
+        autoLoopTimer = null;
+    }
+    currentPhase = 'none';
+    };
     let currentPhase = 'none';
 
     const API_BASE = "http://localhost:8080/api/words";
@@ -615,6 +628,9 @@
     let bombList = [];
     let bombIndex = 0;
 
+    // 🛰️ 绝对时间轴定海神针：全场唯一指针，只增不减
+    let globalTick = 0;
+
     let bombSaveTimer = null;
     let accumulatedLoad = 0;
     let lastWordTimestamp = Date.now();
@@ -624,6 +640,11 @@
     const rawBurningLength = ref(0);
     const rawFrozenLength = ref(0);
 
+    let audioSequenceToken = 0; // 全局发音令牌计数器
+
+    // =========================================================================
+    // 🧠 Vue 战术节奏调校架构
+    // =========================================================================
     const app = createApp({
         setup() {
             const currentPage = ref(1);
@@ -800,7 +821,7 @@
         const row = document.getElementById(`row-raw-${word}`);
         if (row) { row.style.opacity = "0.3"; }
         try {
-            const response = await fetch(`${API_BASE}/filter/kill`, {
+            const response = await fetch(`${API_BASE}/kill/bomb`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ book: currentBookId, word: word, status: type, source: 'killPage' })
@@ -814,21 +835,81 @@
     }
 
     // =========================================================================
-    // 📡 斩杀中枢控制器总线
+    // 🌍 绝对时空全场调度交互总线
     // =========================================================================
-    async function triggerKillWordWordInterface(word, statusType) {
+    /**
+     * @param {string} word - 当前操作的单词
+     * @param {string} actionType - 'stranger'(陌生) / 'vague'(模糊) / 'mastered'(掌握) / 'familiar'(熟悉/自动滚动)
+     */
+    async function handleWordAction(word, actionType) {
+        clearAutoTimer();
         try {
-            await fetch(`${API_BASE}/kill/kill`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ book: currentBookId, word: word, status: statusType, source: 'bomb' })
-            });
+            if (actionType === 'mastered') {
+                // 💎 【情况 A：掌握出队流】— 彻底剥离当前弹夹，不加时空 tick
+                const response = await fetch(`${API_BASE}/filter/kill`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ book: currentBookId, word: word, status: 'easy', source: 'bomb' })
+                });
+                if (!response.ok) throw new Error("分流同步失败");
+
+                bombList.splice(bombIndex, 1);
+                if (bombIndex >= bombList.length && bombList.length > 0) {
+                    bombIndex = bombList.length - 1;
+                }
+            } else {
+                // 📡 【情况 B：绝对阵位滚动流】— 记录埋雷，无情推进绝对时空
+                await fetch(`${API_BASE}/kill/kill`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        book: currentBookId,
+                        word: word,
+                        status: actionType,
+                        source: 'bomb',
+                        currentTick: globalTick // 📡 核心：传递当前绝对锚点给后端
+                    })
+                });
+
+                // 🪐 时空长河稳步前进
+                globalTick++;
+                bombIndex++;
+            }
+
+            totalBrushedCount++;
+
         } catch (err) {
-            console.error("💥 铁血斩杀总线异常:", err);
+            console.error("💥 绝对时空总线交互异常:", err);
+        }
+
+        updateBombHeaderUI();
+
+        // 终局空盘拦截判定
+        if (bombList.length === 0) {
+            isAutoMode = false;
+            updateAutoBtnUI();
+            alert("🌟 当前批次轰炸训练圆满结束！");
+            exitBomb();
+            return;
+        }
+
+        // 驱动状态机自推进
+        if (isAutoMode) {
+            await executeAutoStep();
+        } else {
+            // 🚨 铁血防御：如果前台局部指针越界（说明走满了5步或弹夹空了），强行向后端要精准阵位
+            if (bombIndex >= bombList.length) {
+                await fetchMoreWordsDynamic();
+            } else {
+                showBombWord();
+                if (isAudioEnabled) playCurrentWordAudio();
+            }
         }
     }
 
-    // 🔒 统一原子级打分调度：将前台位移合并为后端的绝对地雷步进
+    // =========================================================================
+    // 🔒 统一原子级打分调度总线（手动按键流完全无缝熔接）
+    // =========================================================================
     async function bombGrade(level) {
         if (bombList.length === 0 || bombIndex >= bombList.length) return;
         clearAutoTimer();
@@ -844,64 +925,29 @@
         }
 
         switch(level) {
-            case 0: // 🌋 陌生：由后端绝对 Tick 在 5 步后触发伏击阵，无需前台 splice
-                await triggerKillWordWordInterface(currentWordObj.word, 'stranger');
-                bombNextReal();
+            case 0: // 🌋 陌生
+                await handleWordAction(currentWordObj.word, 'stranger');
                 break;
             case 1: // ⚡ 模糊
-                await triggerKillWordWordInterface(currentWordObj.word, 'vague');
-                bombNextReal();
+                await handleWordAction(currentWordObj.word, 'vague');
                 break;
             case 2: // 💎 掌握
-                await executeBombKill(currentWordObj);
+                await handleWordAction(currentWordObj.word, 'mastered');
                 break;
         }
     }
 
     // =========================================================================
-    // ❄️ 时空应激状态机与出队持久化
-    // =========================================================================
-    async function executeBombKill(wordObj) {
-        try {
-            const response = await fetch(`${API_BASE}/filter/kill`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ book: currentBookId, word: wordObj.word, status: 'easy', source: 'bomb' })
-            });
-            if (!response.ok) throw new Error("同步失败");
-
-            bombList.splice(bombIndex, 1);
-            if (bombIndex >= bombList.length && bombList.length > 0) { bombIndex = bombList.length - 1; }
-
-            if (bombList.length === 0) {
-                isAutoMode = false;
-                updateAutoBtnUI();
-                alert("🌟 当前批次轰炸训练圆满结束！");
-                exitBomb();
-            } else {
-                if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
-            }
-        } catch (e) {
-            console.error("过滤同步错误:", e);
-            alert("⚠️ 网络异常：分类同步失败！");
-        }
-    }
-
-    function clearAutoTimer() {
-        if (autoLoopTimer) { clearTimeout(autoLoopTimer); autoLoopTimer = null; }
-        currentPhase = 'none';
-    }
-
-    // =========================================================================
-    // 🌀 自适应单轨独立相变状态机
+    // 🌀 自适应单轨独立相变状态机（自动滚动流）
     // =========================================================================
     async function executeAutoStep() {
         if (!isAutoMode) return;
         clearAutoTimer();
 
+        // 🚨 铁血防御线：如果指针走满 5 步，触发拉取
         if (bombIndex >= bombList.length) {
             await fetchMoreWordsDynamic();
-            return;
+            if (!isAutoMode) return;
         }
 
         const current = bombList[bombIndex];
@@ -915,7 +961,7 @@
         saveBombToBackend(current);
         updateBombHeaderUI();
 
-        // 🎭 第一阶段
+        // 🎭 第一阶段展现
         if (strategy === "ZH_FIRST") {
             currentPhase = 'chinese';
             wordEl.style.visibility = 'hidden';
@@ -941,7 +987,7 @@
         autoLoopTimer = setTimeout(() => {
             if (!isAutoMode) return;
 
-            // 🎭 第二阶段
+            // 🎭 第二阶段展现
             if (strategy === "ZH_FIRST") {
                 currentPhase = 'english';
                 wordEl.innerText = current.word;
@@ -958,13 +1004,354 @@
 
             autoLoopTimer = setTimeout(async () => {
                 if (!isAutoMode) return;
-                // 🚀 切词瞬间：同步击发后端的绝对 Tick 计数变更
-                await triggerKillWordWordInterface(current.word, 'auto_next');
-                bombNextReal();
+
+                // 🚀 【核心熔接点】：执行自动切词，走绝对时空大盘总线
+                await handleWordAction(current.word, 'familiar');
+
             }, vm.chineseShowTime);
 
         }, vm.englishBlurTime);
     }
+
+// =========================================================================
+// 🛰️ 时空编排器：弹夹无限重组拉取流（支持少单词自动新一轮滚动）
+// =========================================================================
+async function fetchMoreWordsDynamic() {
+    if (!currentBookId) return;
+    try {
+        console.log(`📡 触发装填请求。发送绝对锚点 GlobalTick = ${globalTick}`);
+
+        // 1. 尝试拉取当前批次的新词
+        const response = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING&globalTick=${globalTick}&size=5`);
+        const newWords = await response.json();
+
+        if (newWords && newWords.length > 0) {
+            // 正常承接新弹夹
+            bombList = newWords;
+            bombIndex = 0;
+
+            if (isAutoMode) {
+                await executeAutoStep();
+            } else {
+                showBombWord();
+                if (isAudioEnabled) playCurrentWordAudio();
+            }
+        } else {
+            // 🚨 【核心高能改动点】：当大盘洗空，或者单词过少导致后端无法吐出新词时
+            console.warn("🔄 触发新一轮滚动：大盘词弹已消耗完毕，正在强行重置时空轴...");
+
+            // 🎯 瞬间将全场的绝对时空长河归零！重新开始排阵
+            globalTick = 0;
+            bombIndex = 0;
+
+            // 📡 触发后端重置/重新激活该词书的燃烧状态（通知后端拉开新一轮死磕大幕）
+            // 注意：这里调用一个重置轮次的同步接口，让所有未彻底分流的词重新进入物理大盘
+            const resetResponse = await fetch(`${API_BASE}/bomb/reset?bookId=${currentBookId}`, { method: 'POST' });
+
+            if (resetResponse.ok) {
+                // 重置成功后，立刻重新抓取新一轮的第一批词弹
+                const retryResponse = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING&globalTick=${globalTick}&size=5`);
+                const retryWords = await retryResponse.json();
+
+                if (retryWords && retryWords.length > 0) {
+                    bombList = retryWords;
+                    console.log("💎 [新一轮时空滚动开启] 已成功装填新一轮首批词弹！");
+
+                    if (isAutoMode) {
+                        await executeAutoStep();
+                    } else {
+                        showBombWord();
+                        if (isAudioEnabled) playCurrentWordAudio();
+                    }
+                } else {
+                    // 如果真的一个待刷单词都没有了（全盘彻底全绿掌握了）
+                    alert("🎉 奇迹诞生！当前词书所有单词已彻底全量【掌握】分流，无词可刷！");
+                    exitBomb();
+                }
+            } else {
+                alert("⚠️ 轮次重置失败，请检查后端 /bomb/reset 接口状态！");
+                exitBomb();
+            }
+        }
+    } catch (e) {
+        console.error("时空编排器对齐或轮次重置失败:", e);
+        exitBomb();
+    }
+}
+
+    // =========================================================================
+    // 🧠 极速自适应认知负载同步控制总线（提前触发轰炸重组的强行抓取器）
+    // =========================================================================
+    async function saveBombToBackend(currentWordObject) {
+        if (!currentBookId || !currentWordObject) return;
+        const now = Date.now();
+        const duration = (now - lastWordTimestamp) / 1000;
+        lastWordTimestamp = now;
+
+        let wordWeight = 1.0;
+        if (currentWordObject.difficulty) {
+            switch (currentWordObject.difficulty) {
+                case 'STUCK_LOOP':     wordWeight += 3.5; break;
+                case 'REVIVE_FALL':
+                case 'KILL_RECOUP':    wordWeight += 2.5; break;
+                case 'INIT_STRANGER':  wordWeight += 2.0; break;
+                case 'INIT_VAGUE':     wordWeight += 1.0; break;
+                case 'SMOOTH_KILL':    wordWeight -= 0.5; break;
+            }
+        }
+        accumulatedLoad += duration * wordWeight;
+
+        // 异步快照备份
+        try {
+            fetch(`${API_BASE}/snapshot/save?bookId=${encodeURIComponent(currentBookId)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word: currentWordObject.word, streak: currentWordObject.streak || 0 })
+            });
+        } catch(e) {}
+
+        // 🚨 错峰防灾高能控制点：负载堆积到达阈值（突发认知过载或安全策略触发提前刷新）
+        const strikeThreshold = (currentWordObject.difficulty === 'STUCK_LOOP') ? 10 : 15;
+        if (accumulatedLoad >= strikeThreshold) {
+            console.warn("⚠️ 判定当前处于极端认知过载！强行提前呼叫轰炸接口重配时空阵位。");
+            accumulatedLoad = 0;
+            if (bombSaveTimer) clearTimeout(bombSaveTimer);
+
+            // 🚀 全面剔除老concat方法，遇到紧急情况提前呼叫破坏性刷新，带着当前的 globalTick 让后端动态排雷！
+            await fetchMoreWordsDynamic();
+            return;
+        }
+
+        if (bombSaveTimer) clearTimeout(bombSaveTimer);
+        bombSaveTimer = setTimeout(() => { accumulatedLoad = 0; }, 4000);
+    }
+
+    // =========================================================================
+    // 🛠️ 辅助视效与控制手柄流
+    // =========================================================================
+    function toggleAutoMode() {
+        if (vm.settingVisible) return;
+        isAutoMode = !isAutoMode;
+
+        if (!isAutoMode) {
+            clearAutoTimer();
+            pauseTacticalTimer();
+            window.speechSynthesis.cancel();
+        } else {
+            startTacticalTimer();
+        }
+        updateAutoBtnUI();
+        if (isAutoMode) { executeAutoStep(); }
+    }
+
+    function updateAutoBtnUI() {
+        const btn = document.getElementById('autoModeBtn');
+        if (btn) { btn.innerText = isAutoMode ? "⏹️ 停止自动滚动" : "🌀 开启自动滚动"; }
+    }
+
+    function speakCurrentWord() {
+        const word = document.getElementById('bWord').innerText.trim();
+        if (!word || word === "Loading") return;
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(word);
+        msg.lang = 'en-US';
+        msg.rate = 0.9;
+        window.speechSynthesis.speak(msg);
+    }
+
+    function toggleAudio() {
+        isAudioEnabled = !isAudioEnabled;
+        document.getElementById('audioToggleBtn').innerText = isAudioEnabled ? "🔊 语音: 开" : "🔇 语音: 关";
+        if (!isAudioEnabled) { window.speechSynthesis.cancel(); } else { playCurrentWordAudio(); }
+    }
+
+    function playWordAudio(word) {
+    return new Promise((resolve) => {
+        if (!isAudioEnabled) return resolve();
+
+        // 每次发音，生成一个唯一的时空令牌
+        const myToken = ++audioSequenceToken;
+        window.speechSynthesis.cancel();
+
+        const safeTimeout = setTimeout(() => resolve(), 2000);
+
+        try {
+            const utter = new SpeechSynthesisUtterance(word);
+            utter.lang = 'en-US';
+            utter.rate = 0.9;
+
+            utter.onend = () => {
+                clearTimeout(safeTimeout);
+                // 只有当期令牌与全局令牌完全一致时，才允许释放并执行下一步
+                if (myToken === audioSequenceToken) resolve();
+            };
+            utter.onerror = () => {
+                clearTimeout(safeTimeout);
+                if (myToken === audioSequenceToken) resolve();
+            };
+
+            window.speechSynthesis.speak(utter);
+        } catch (e) {
+            clearTimeout(safeTimeout);
+            resolve();
+        }
+    });
+}
+
+    async function startWordBomb() {
+        if (!currentBookId) return alert("请先选择单词书！");
+        let snapshot = null;
+        try {
+            const res = await fetch(`${API_BASE}/snapshot/load?bookId=${currentBookId}`);
+            if (res.ok && res.status !== 204) {
+                snapshot = await res.json();
+                if (snapshot && snapshot.bombList && typeof snapshot.bombList === 'string') {
+                    snapshot.bombList = JSON.parse(snapshot.bombList);
+                }
+            }
+        } catch (e) { console.warn(e); }
+
+        totalBrushedCount = 0;
+
+        if (snapshot && snapshot.bombList && snapshot.bombList.length > 0) {
+            const timeDiff = Date.now() - snapshot.updateTime;
+            const TWENTY_MINUTES = 20 * 60 * 1000;
+            const ONE_HOUR       = 60 * 60 * 1000;
+            const NINE_HOURS     = 9 * 60 * 60 * 1000;
+
+            if (timeDiff <= TWENTY_MINUTES) {
+                if (confirm(`⚡ 【L1级·记忆余热】检测到现场。\n是否100%复原现场继续死磕？`)) {
+                    bombList = snapshot.bombList; bombIndex = snapshot.bombIndex; launchBombOverlay(); return;
+                }
+            } else if (timeDiff <= ONE_HOUR) {
+                if (confirm(`⏳ 【L2级·记忆流失】系统已自动【战术倒带 2 词】，是否进入？`)) {
+                    bombList = snapshot.bombList; bombIndex = Math.max(0, snapshot.bombIndex - 2); launchBombOverlay(); return;
+                }
+            } else if (timeDiff <= NINE_HOURS) {
+                if (confirm(`❄️ 【L3级·突触冷切】系统已自动【战术倒带 5 词】，是否进入？`)) {
+                    bombList = snapshot.bombList; bombIndex = Math.max(0, snapshot.bombIndex - 5); launchBombOverlay(); return;
+                }
+            } else {
+                const remainingWords = snapshot.bombList.slice(snapshot.bombIndex).map(item => item.word);
+                if (remainingWords.length > 0) { await executeServerRestore(remainingWords); }
+                await clearBackendSnapshot();
+            }
+        }
+
+        try {
+            const bombRes = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING&globalTick=${globalTick}&size=5`);
+            bombList = await bombRes.json();
+        } catch (bombErr) { console.error(bombErr); }
+
+        if (bombList.length === 0) { return alert("🎉 恭喜！当前无待轰炸可用核心词弹！"); }
+
+        bombIndex = 0;
+        launchBombOverlay();
+    }
+
+    function startTacticalTimer() {
+        if (vm.bombDuration <= 0) return;
+        if (bombCountdownTimer) clearInterval(bombCountdownTimer);
+
+        if (tacticalRemainingMillis <= 0) { tacticalRemainingMillis = vm.bombDuration * 60 * 1000; }
+        bombEndTimeStamp = Date.now() + tacticalRemainingMillis;
+        const totalDurationMillis = vm.bombDuration * 60 * 1000;
+
+        const bar = document.getElementById('bombProgressBar');
+        if (bar) { bar.style.animationPlayState = 'running'; bar.classList.remove('danger-glow'); }
+
+        bombCountdownTimer = setInterval(() => {
+            tacticalRemainingMillis = bombEndTimeStamp - Date.now();
+            if (tacticalRemainingMillis <= 0) {
+                clearInterval(bombCountdownTimer); bombCountdownTimer = null; tacticalRemainingMillis = 0;
+                if (bar) { bar.style.width = '0%'; bar.style.animationPlayState = 'paused'; }
+                isAutoMode = false; updateAutoBtnUI();
+                alert(`⏰ 【战术时限已到】大盘滚动为您瞬间锁定。`);
+                exitBomb();
+            } else {
+                const currentPercent = (tacticalRemainingMillis / totalDurationMillis) * 100;
+                if (bar) {
+                    bar.style.width = `${currentPercent}%`;
+                    if (currentPercent < 15) { bar.classList.add('danger-glow'); } else { bar.classList.remove('danger-glow'); }
+                }
+                const minutes = Math.floor(tacticalRemainingMillis / 60000);
+                const seconds = Math.floor((tacticalRemainingMillis % 60000) / 1000);
+                const timerEl = document.getElementById('bombTimerDisplay');
+                if (timerEl) { timerEl.innerText = `滚动 ⏳ 倒计时: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`; }
+            }
+        }, 1000);
+    }
+
+    function pauseTacticalTimer() {
+        if (bombCountdownTimer) { clearInterval(bombCountdownTimer); bombCountdownTimer = null; }
+        const bar = document.getElementById('bombProgressBar');
+        if (bar) bar.style.animationPlayState = 'paused';
+    }
+
+    function launchBombOverlay() {
+        document.getElementById('bombOverlay').style.display = 'flex';
+        const bar = document.getElementById('bombProgressBar');
+        if (bar) { bar.style.animationPlayState = 'running'; bar.style.width = '100%'; }
+        if (vm.bombDuration > 0 && isAutoMode) { tacticalRemainingMillis = vm.bombDuration * 60 * 1000; }
+
+        showBombWord(false);
+        updateBombHeaderUI();
+        if (isAutoMode) { executeAutoStep(); }
+    }
+
+    function updateBombHeaderUI() {
+        const selectEl = document.getElementById('bookSelect');
+        const currentBookName = selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex].text : "未知词书";
+        document.getElementById('bombCategory').innerText = currentBookName;
+
+        const remainingEl = document.getElementById('bombRemainingCount');
+        if (remainingEl) { remainingEl.innerText = `已击发：${totalBrushedCount} 词`; }
+        const indexEl = document.getElementById('bombCurrentIndex');
+        if (indexEl) { indexEl.innerText = totalBrushedCount; }
+
+        const timerEl = document.getElementById('bombTimerDisplay');
+        if (vm.bombDuration <= 0) {
+            if (timerEl) timerEl.innerText = "♾️ 无限制轰炸模式";
+        } else if (!isAutoMode && tacticalRemainingMillis <= 0) {
+            if (timerEl) { timerEl.innerText = `⏳ 战术限时: ${vm.bombDuration} 分钟 (等待开启)`; timerEl.style.color = '#8e918f'; }
+        }
+    }
+
+    function bombNextReal() {
+        // 🚀 手动调用切词（不打分，对齐到熟悉流）
+        if (bombIndex < bombList.length) {
+            const currentWordObj = bombList[bombIndex];
+            handleWordAction(currentWordObj.word, 'familiar');
+        }
+    }
+
+    async function bombPrev() {
+        clearAutoTimer();
+        if (bombIndex > 0) {
+            const currentWordObj = bombList[bombIndex];
+            await triggerKillWordWordInterface(currentWordObj.word, 'prev');
+            bombIndex--;
+            if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
+        }
+        updateBombHeaderUI();
+    }
+
+    function bombNext() { clearAutoTimer(); bombNextReal(); }
+
+    async function triggerKillWordWordInterface(word, statusType) {
+        try {
+            await fetch(`${API_BASE}/kill/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book: currentBookId, word: word, status: statusType, source: 'bomb' })
+            });
+        } catch (err) {
+            console.error("💥 铁血斩杀总线异常:", err);
+        }
+    }
+
+    function playCurrentWordAudio() { if (bombList[bombIndex]) playWordAudio(bombList[bombIndex].word); }
+    function formatDefinition(def) { if (!def) return ""; return def.replace(/(vt\.|vi\.|n\.|adj\.|adv\.|prep\.|conj\.|interj\.)/g, '<br>$1').trim(); }
 
     function showBombWord(autoSpeak = true) {
         if (bombIndex < 0) bombIndex = 0;
@@ -997,7 +1384,6 @@
         }
 
         updateBombHeaderUI();
-        saveBombToBackend(current);
     }
 
     function toggleTrans() {
@@ -1042,200 +1428,6 @@
         }, 100);
     }
 
-    function toggleAutoMode() {
-        if (vm.settingVisible) return;
-        isAutoMode = !isAutoMode;
-
-        if (!isAutoMode) {
-            clearAutoTimer();
-            pauseTacticalTimer();
-            window.speechSynthesis.cancel();
-        } else {
-            startTacticalTimer();
-        }
-        updateAutoBtnUI();
-        if (isAutoMode) { executeAutoStep(); }
-    }
-
-    function updateAutoBtnUI() {
-        const btn = document.getElementById('autoModeBtn');
-        if (btn) { btn.innerText = isAutoMode ? "⏹️ 停止自动滚动" : "🌀 开启自动滚动"; }
-    }
-
-    function speakCurrentWord() {
-        const word = document.getElementById('bWord').innerText.trim();
-        if (!word || word === "Loading") return;
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(word);
-        msg.lang = 'en-US';
-        msg.rate = 0.9;
-        window.speechSynthesis.speak(msg);
-    }
-
-    function toggleAudio() {
-        isAudioEnabled = !isAudioEnabled;
-        document.getElementById('audioToggleBtn').innerText = isAudioEnabled ? "🔊 语音: 开" : "🔇 语音: 关";
-        if (!isAudioEnabled) { window.speechSynthesis.cancel(); } else { playCurrentWordAudio(); }
-    }
-
-    function playWordAudio(word) {
-        return new Promise((resolve) => {
-            if (!isAudioEnabled) return resolve();
-            const safeTimeout = setTimeout(() => resolve(), 2000);
-            try {
-                window.speechSynthesis.cancel();
-                const utter = new SpeechSynthesisUtterance(word);
-                utter.lang = 'en-US';
-                utter.onend = () => { clearTimeout(safeTimeout); resolve(); };
-                utter.onerror = () => { clearTimeout(safeTimeout); resolve(); };
-                window.speechSynthesis.speak(utter);
-            } catch (e) { clearTimeout(safeTimeout); resolve(); }
-        });
-    }
-
-    // =========================================================================
-    // 🚀 核心冷热滚动、艾宾浩斯裁剪与弹夹无限拉取流
-    // =========================================================================
-    async function startWordBomb() {
-        if (!currentBookId) return alert("请先选择单词书！");
-        let snapshot = null;
-        try {
-            const res = await fetch(`${API_BASE}/snapshot/load?bookId=${currentBookId}`);
-            if (res.ok && res.status !== 204) {
-                snapshot = await res.json();
-                if (snapshot && snapshot.bombList && typeof snapshot.bombList === 'string') {
-                    snapshot.bombList = JSON.parse(snapshot.bombList);
-                }
-            }
-        } catch (e) { console.warn(e); }
-
-        totalBrushedCount = 0;
-
-        if (snapshot && snapshot.bombList && snapshot.bombList.length > 0) {
-            const timeDiff = Date.now() - snapshot.updateTime;
-            const TWENTY_MINUTES = 20 * 60 * 1000;
-            const ONE_HOUR       = 60 * 60 * 1000;
-            const NINE_HOURS     = 9 * 60 * 60 * 1000;
-
-            if (timeDiff <= TWENTY_MINUTES) {
-                if (confirm(`⚡ 【L1级·记忆余热】检测到现场。\n是否100%复原现场继续死磕？`)) {
-                    bombList = snapshot.bombList; bombIndex = snapshot.bombIndex; launchBombOverlay(); return;
-                }
-            } else if (timeDiff <= ONE_HOUR) {
-                if (confirm(`⏳ 【L2级·记忆流失】系统已自动【战术倒带 2 词】，是否进入？`)) {
-                    bombList = snapshot.bombList; bombIndex = Math.max(0, snapshot.bombIndex - 2); launchBombOverlay(); return;
-                }
-            } else if (timeDiff <= NINE_HOURS) {
-                if (confirm(`❄️ 【L3级·突触冷切】系统已自动【战术倒带 5 词】，是否进入？`)) {
-                    bombList = snapshot.bombList; bombIndex = Math.max(0, snapshot.bombIndex - 5); launchBombOverlay(); return;
-                }
-            } else {
-                const remainingWords = snapshot.bombList.slice(snapshot.bombIndex).map(item => item.word);
-                if (remainingWords.length > 0) { await executeServerRestore(remainingWords); }
-                await clearBackendSnapshot();
-            }
-        }
-
-        try {
-            const bombRes = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING`);
-            bombList = await bombRes.json();
-        } catch (bombErr) { console.error(bombErr); }
-
-        if (bombList.length === 0) { return alert("🎉 恭喜！当前无待轰炸可用核心词弹！"); }
-
-        bombIndex = 0;
-        launchBombOverlay();
-    }
-
-    // 🕒 满格百分比精准递减倒计时
-    function startTacticalTimer() {
-        if (vm.bombDuration <= 0) return;
-        if (bombCountdownTimer) clearInterval(bombCountdownTimer);
-
-        if (tacticalRemainingMillis <= 0) { tacticalRemainingMillis = vm.bombDuration * 60 * 1000; }
-        bombEndTimeStamp = Date.now() + tacticalRemainingMillis;
-        const totalDurationMillis = vm.bombDuration * 60 * 1000;
-
-        const bar = document.getElementById('bombProgressBar');
-        if (bar) { bar.style.animationPlayState = 'running'; bar.classList.remove('danger-glow'); }
-
-        bombCountdownTimer = setInterval(() => {
-            tacticalRemainingMillis = bombEndTimeStamp - Date.now();
-            if (tacticalRemainingMillis <= 0) {
-                clearInterval(bombCountdownTimer); bombCountdownTimer = null; tacticalRemainingMillis = 0;
-                if (bar) { bar.style.width = '0%'; bar.style.animationPlayState = 'paused'; }
-                isAutoMode = false; updateAutoBtnUI();
-                alert(`⏰ 【战术时限已到】大盘滚动为您瞬间锁定。`);
-                exitBomb();
-            } else {
-                const currentPercent = (tacticalRemainingMillis / totalDurationMillis) * 100;
-                if (bar) {
-                    bar.style.width = `${currentPercent}%`;
-                    if (currentPercent < 15) { bar.classList.add('danger-glow'); } else { bar.classList.remove('danger-glow'); }
-                }
-                const minutes = Math.floor(tacticalRemainingMillis / 60000);
-                const seconds = Math.floor((tacticalRemainingMillis % 60000) / 1000);
-                const timerEl = document.getElementById('bombTimerDisplay');
-                if (timerEl) { timerEl.innerText = `滚动 ⏳ 倒计时: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`; }
-            }
-        }, 1000);
-    }
-
-    function pauseTacticalTimer() {
-        if (bombCountdownTimer) { clearInterval(bombCountdownTimer); bombCountdownTimer = null; }
-        const bar = document.getElementById('bombProgressBar');
-        if (bar) bar.style.animationPlayState = 'paused';
-    }
-
-    // 🧠 极速自适应认知负载同步控制总线
-    async function saveBombToBackend(currentWordObject) {
-        if (!currentBookId || !currentWordObject) return;
-        const now = Date.now();
-        const duration = (now - lastWordTimestamp) / 1000;
-        lastWordTimestamp = now;
-
-        let wordWeight = 1.0;
-        if (currentWordObject.difficulty) {
-            switch (currentWordObject.difficulty) {
-                case 'STUCK_LOOP':     wordWeight += 3.5; break;
-                case 'REVIVE_FALL':
-                case 'KILL_RECOUP':    wordWeight += 2.5; break;
-                case 'INIT_STRANGER':  wordWeight += 2.0; break;
-                case 'INIT_VAGUE':     wordWeight += 1.0; break;
-                case 'SMOOTH_KILL':    wordWeight -= 0.5; break;
-            }
-        }
-        accumulatedLoad += duration * wordWeight;
-
-        try {
-            fetch(`${API_BASE}/snapshot/save?bookId=${encodeURIComponent(currentBookId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word: currentWordObject.word, streak: currentWordObject.streak || 0 })
-            });
-        } catch(e) {}
-
-        const strikeThreshold = (currentWordObject.difficulty === 'STUCK_LOOP') ? 10 : 15;
-        if (accumulatedLoad >= strikeThreshold) {
-            executeActualSaveAndReload();
-            return;
-        }
-        if (bombSaveTimer) clearTimeout(bombSaveTimer);
-        bombSaveTimer = setTimeout(() => { accumulatedLoad = 0; }, 4000);
-    }
-
-    async function executeActualSaveAndReload() {
-        accumulatedLoad = 0;
-        try {
-            const res = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING`);
-            const newPayload = await res.json();
-            if (newPayload && newPayload.length > 0) {
-                bombList = bombList.concat(newPayload);
-                console.log("💎 [自适应大盘反哺] 新弹药无缝焊接到前线战术尾部。");
-            }
-        } catch (e) { console.error(e); }
-    }
-
     async function executeServerRestore(wordsArray) {
         try {
             await fetch(`${API_BASE}/kill/restore`, {
@@ -1249,74 +1441,6 @@
     async function clearBackendSnapshot() {
         try { await fetch(`${API_BASE}/snapshot/clear?bookId=${currentBookId}`, { method: 'POST' }); } catch (e) {}
     }
-
-    function launchBombOverlay() {
-        document.getElementById('bombOverlay').style.display = 'flex';
-        const bar = document.getElementById('bombProgressBar');
-        if (bar) { bar.style.animationPlayState = 'running'; bar.style.width = '100%'; }
-        if (vm.bombDuration > 0 && isAutoMode) { tacticalRemainingMillis = vm.bombDuration * 60 * 1000; }
-
-        showBombWord(false);
-        updateBombHeaderUI();
-        if (isAutoMode) { executeAutoStep(); }
-    }
-
-    async function fetchMoreWordsDynamic() {
-        try {
-            const response = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING`);
-            const newWords = await response.json();
-            if (newWords && newWords.length > 0) {
-                bombList = bombList.concat(newWords); showBombWord();
-            } else {
-                alert("🎉 恭喜！当前大盘已无任何待背词弹，任务圆满结束！"); exitBomb();
-            }
-        } catch (e) { exitBomb(); }
-    }
-
-    function updateBombHeaderUI() {
-        const selectEl = document.getElementById('bookSelect');
-        const currentBookName = selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex].text : "未知词书";
-        document.getElementById('bombCategory').innerText = currentBookName;
-
-        const remainingEl = document.getElementById('bombRemainingCount');
-        if (remainingEl) { remainingEl.innerText = `已击发：${totalBrushedCount} 词`; }
-        const indexEl = document.getElementById('bombCurrentIndex');
-        if (indexEl) { indexEl.innerText = totalBrushedCount; }
-
-        const timerEl = document.getElementById('bombTimerDisplay');
-        if (vm.bombDuration <= 0) {
-            if (timerEl) timerEl.innerText = "♾️ 无限制轰炸模式";
-        } else if (!isAutoMode && tacticalRemainingMillis <= 0) {
-            if (timerEl) { timerEl.innerText = `⏳ 战术限时: ${vm.bombDuration} 分钟 (等待开启)`; timerEl.style.color = '#8e918f'; }
-        }
-    }
-
-    // 进位控制与绝对增量累加器
-    function bombNextReal() {
-        totalBrushedCount++;
-        if (bombIndex < bombList.length - 1) {
-            bombIndex++;
-            if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
-        } else {
-            fetchMoreWordsDynamic();
-        }
-        updateBombHeaderUI();
-    }
-
-    async function bombPrev() {
-        clearAutoTimer();
-        if (bombIndex > 0) {
-            const currentWordObj = bombList[bombIndex];
-            await triggerKillWordWordInterface(currentWordObj.word, 'prev');
-            bombIndex--;
-            if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
-        }
-        updateBombHeaderUI();
-    }
-
-    function bombNext() { clearAutoTimer(); bombNextReal(); }
-    function playCurrentWordAudio() { if (bombList[bombIndex]) playWordAudio(bombList[bombIndex].word); }
-    function formatDefinition(def) { if (!def) return ""; return def.replace(/(vt\.|vi\.|n\.|adj\.|adv\.|prep\.|conj\.|interj\.)/g, '<br>$1').trim(); }
 
     async function saveProgressToBackend() {
         if (!currentBookId) return;
@@ -1345,9 +1469,6 @@
         if (currentBookId) { selectBook(currentBookId, document.getElementById('currentBookName').innerText); }
     }
 
-    // =========================================================================
-    // ⚙️ 大盘后端数据通信与钩子初始化
-    // =========================================================================
     function handleBookChange(selectElement) {
         const bookId = selectElement.value;
         const bookName = selectElement.options[selectElement.selectedIndex].text;
