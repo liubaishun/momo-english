@@ -5,6 +5,9 @@ package com.momo.dto;
  */
 
 public interface WordKillProjection {
+
+    Long getUserId();
+
     String getWord();
 
     String getPhonetic();

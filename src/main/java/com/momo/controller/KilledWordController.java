@@ -26,7 +26,8 @@ public class KilledWordController {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
-    private WordService wordService;    @Autowired
+    private WordService wordService;
+    @Autowired
     private RollingRefuelEngine refuelEngine;
 
     @Autowired
@@ -59,7 +60,7 @@ public class KilledWordController {
         if (bookId == null || status == null) {
             return ResponseEntity.badRequest().build();
         }
-        List<WordVO> list = wordKillService.getKillPageWords(bookId, status);
+        List<WordVO> list = wordKillService.getKillPageWords(bookId, status,1L);
 
         return ResponseEntity.ok(list);
     }
@@ -69,17 +70,29 @@ public class KilledWordController {
      * GET /api/word/bomb/load?bookId=xxx
      */
     @GetMapping("/bomb/load")
-    public ResponseEntity<List<WordVO>> loadBombQueue(@RequestParam("bookId") String bookId, @RequestParam(value = "status", required = false, defaultValue = "BURNING")String status) {
+    public ResponseEntity<List<WordVO>> loadBombQueue(@RequestParam("bookId") String bookId,
+                                                      @RequestParam(value = "status", required = false, defaultValue = "BURNING") String status,
+                                                      @RequestParam("globalTick") int globalTick) {
         if (bookId == null || status == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        List<WordVO> list = wordKillService.getKillPageWords(bookId, status);
+        List<WordVO> list = wordKillService.getKillPageWords(bookId, status,1L);
 
         //List<WordVO> activeQueue = wordKillService.calculateEightDimensionalBombMagazine(list);
-        List<WordVO> activeQueue = refuelEngine.memoryStatePredictionEngine(list,bookId);
+        List<WordVO> activeQueue = refuelEngine.memoryStatePredictionEngine(list, bookId, 1L,globalTick);
 
         return ResponseEntity.ok(activeQueue);
+    }
+
+
+    @PostMapping("/bomb/reset")
+    public ResponseEntity<?> resetBookRound(@RequestParam String bookId) {
+        // 1. 找到当前词书中所有处于待刷状态的单词
+        // 2. 清空它们在当前轮次被标记的特殊排阵 Tick
+        // 3. 让它们能够重新被 /bomb/load 接口检索到
+        refuelEngine.resetBurningWordsForNewRound(bookId, 1L);
+        return ResponseEntity.ok().build();
     }
 
     /**
@@ -92,10 +105,10 @@ public class KilledWordController {
         String bookId = (String) payload.get("book");
         String word = (String) payload.get("word");
         String masteryDegree = (String) payload.getOrDefault("status", "mastered");
-        String source = (String) payload.get("source");
+        int currentTick = (int) payload.get("currentTick");
 
         // 调用 Service 处理
-        wordKillService.processWordReview(bookId, word, masteryDegree, source);
+        wordKillService.processWordReview(bookId, word, masteryDegree, currentTick,1L);
 
         Map<String, String> result = new HashMap<>();
         result.put("status", "success");
@@ -103,6 +116,26 @@ public class KilledWordController {
         return result;
     }
 
+    /**
+     * 4. 斩杀单个单词（按书隔离，并记录难度分层）
+     * 列表手动点击是为了“对刚导入的单词进行快速分拣，标记陌生、模糊、掌握”。
+     * 此时用户在列表上的点击，本质上是在进行首次身份定义，而不是普通的复习滚动。
+     */
+    @PostMapping("/kill/bomb")
+    public Map<String, String> bombWord(@RequestBody Map<String, Object> payload) {
+        String bookId = (String) payload.get("book");
+        String word = (String) payload.get("word");
+        String masteryDegree = (String) payload.getOrDefault("masteryDegree", "mastered");
+        String source = (String) payload.get("source");
+
+        // 调用 Service 处理
+        wordKillService.killordReview(0L,bookId, word, masteryDegree, source);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("message", "成功处理单词: " + word);
+        return result;
+    }
 
 
     /**
@@ -126,7 +159,7 @@ public class KilledWordController {
         }
 
         // 交付 Service 层，并将 source 战术下发
-        wordService.restoreWords(bookId, words, source);
+        wordService.restoreWords(0L,bookId, words, source);
 
         result.put("status", "success");
         result.put("message", "成功处理 " + words.size() + " 个单词的还原请求");

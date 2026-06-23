@@ -16,8 +16,6 @@ public class WordVO {
     private String status = "RAW";
     private String difficulty;  // 战术实时状态: "STUCK_LOOP"(特级卡壳), "REVIVE_FALL"(回炉), "INIT_STRANGER", "INIT_VAGUE"
 
-
-
     private Long lastReview;    // 最近一次复习/提取的时间戳（毫秒级）
 
     // === 3. 战术统计与生命周期计数器 ===
@@ -31,15 +29,12 @@ public class WordVO {
     private Double dynamicPriorityScore; // 最终通过公式算出的【应激轰炸指数】，后端据此做降序排列
     private Integer reviewIntervalMinutes; // 当前复习设定的期望半衰期/复习间隔（分钟），用于艾宾浩斯留存率计算
     private Integer masteryLevel;        // 掌握熟练度分级 (0-5级)，由 reviewCount 动态映射，用于熟词降权
-// === 5. 遗忘对抗终极指标 ===
     /**
      * 熟悉深度（斩杀通关计数器）
      * 行为：每次在轰炸机或主表里【连续秒杀】或【顺利通关一组】，该值 +1
      * 触发线：只有当 familiarDepth >= 5 时，状态才允许从 "BURNING" 转为 "FROZEN" (真正冻结)
      */
     private Integer familiarDepth = 0;
-
-
     /**
      * 🛰️ 滚动轰炸机战术控制线
      * "EN_TO_CN" : 先英后中（默认，适合硬核盲测音标和拼写）
@@ -47,11 +42,9 @@ public class WordVO {
      */
     private String displayStrategy = "EN_TO_CN";
 
-
-
     // === 🧠 记忆状态预测系统 (Memory State Prediction System) 核心指标 ===
-    private double difficultyAa = 50.0;       // 1. 当前动态难度 (0.0 - 100.0)
-    private double stability = 2.0;          // 2. 记忆稳定度 (Stability, 单位：天，初始生词给2天)
+    private Double difficultyAa = 50.0;       // 1. 当前动态难度 (0.0 - 100.0)
+    private Double stability = 2.0;          // 2. 记忆稳定度 (Stability, 单位：天，初始生词给2天)
     private double memoryStrength = 0.0;     // 3. 当前记忆强度 (短期震荡指标)
     private double forgetProbability = 0.0;  // 4. 预测遗忘概率 (0.0 - 1.0)
 
@@ -74,10 +67,6 @@ public class WordVO {
     public void setFamiliarDepth(Integer familiarDepth) {
         this.familiarDepth = familiarDepth;
     }
-    // ==========================================
-    // 构造函数、Getters & Setters
-    // ==========================================
-
     public WordVO() {
         this.wrongCount = 0;
         this.totalWrongCount = 0;
@@ -247,19 +236,19 @@ public class WordVO {
     }
 
 
-    public double getDifficultyAa() {
+    public Double getDifficultyAa() {
         return difficultyAa;
     }
 
-    public void setDifficultyAa(double difficultyAa) {
+    public void setDifficultyAa(Double difficultyAa) {
         this.difficultyAa = difficultyAa;
     }
 
-    public double getStability() {
+    public Double getStability() {
         return stability;
     }
 
-    public void setStability(double stability) {
+    public void setStability(Double stability) {
         this.stability = stability;
     }
 
@@ -295,43 +284,12 @@ public class WordVO {
         this.expireTimestamp = expireTimestamp;
     }
 
-    public int getTriggerTargetIndex() {
+    public Integer getTriggerTargetIndex() {
         return triggerTargetIndex;
     }
 
-    public void setTriggerTargetIndex(int triggerTargetIndex) {
+    public void setTriggerTargetIndex(Integer triggerTargetIndex) {
         this.triggerTargetIndex = triggerTargetIndex;
     }
-
-    // =========================================================================
-    // ⚙️ 核心演算法：遗忘概率与综合优先级计算 (对应你的四、六章蓝图)
-    // =========================================================================
-    public void calculateForgetAndPriority() {
-        long now = System.currentTimeMillis();
-        long lastReviewTime = this.getLastReview() != null ? this.getLastReview() : 0L;
-
-        // 1. 计算自上次复习以来流逝的时间 (单位：天)
-        // 如果是全新未碰过的词，默认流逝时间给 1.5 天，使其遗忘概率天生处于高位
-        double daysPassed = (lastReviewTime == 0L) ? 1.5 : (double) (now - lastReviewTime) / (1000 * 60 * 60 * 24);
-
-        // 2. 🔥 引入核心脑科学公式计算遗忘概率: $P_{forget} = 1 - e^{-\frac{t}{S}}$
-        // 稳定度（stability）越高，分母越大，遗忘概率上升越慢
-        double currentStability = Math.max(0.1, this.stability);
-        this.forgetProbability = 1.0 - Math.exp(-daysPassed / currentStability);
-
-        // 3. 💥 升级排序逻辑：优先推送“快忘了的词”，而不是“刚刚答错的词”
-        // 映射公式：Priority = ForgetProbability * 100 + Difficulty * 0.5 + WrongStreak * 10
-        int wrongStreak = this.getWrongCount() != null ? this.getWrongCount() : 0;
-
-        double priority = (this.forgetProbability * 100.0)
-                + (this.difficultyAa * 0.5)
-                + (wrongStreak * 10.0);
-
-        this.setDynamicPriorityScore(priority);
-    }
-
-
-
-
 
 }

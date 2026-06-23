@@ -221,16 +221,17 @@
 
         /* 🚀 模块 4：全屏应激背词大幕 */
         .bomb-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: #0f0f11;
-            z-index: 9999;
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: #0f0f11;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-bottom: 100px;   /* 🚀 核心安全留白：确保单词和释义永远在中央，绝不跟底部的按钮撞车 */
+}
 
         .bomb-header-fixed {
             position: fixed;
@@ -289,16 +290,21 @@
         .btn-setting-icon:hover { background-color: rgba(255,255,255,0.06); }
 
         /* 🎯 模块 5：评分器组件 */
-        .bomb-controls {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            width: 100%;
-            padding: 15px;
-            background: rgba(19, 19, 20, 0.85);
-            backdrop-filter: blur(10px);
-        }
+        /* 🎯 原生硬核样式保持不变，仅实施位置下挪与底部固定 */
+.bomb-controls {
+    position: absolute;         /* 脱离普通文档流，强行锚定底部 */
+    bottom: 0;                  /* 紧贴屏幕最下方 */
+    left: 0;
+    width: 100%;                /* 宽度依然吃满两端，保持原版大盘平铺气势 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;                  /* 保持原版紧凑的间距 */
+    padding: 20px 15px 24px;    /* 稍微加深底部留白垫高，给手指和视线更舒适的落脚点 */
+    background: rgba(19, 19, 20, 0.95); /* 保持你原本的 Gemini 原生纯净暗黑底色 */
+    border-top: 1px solid var(--border-color); /* 顶部保留你标志性的细腻边框分割线 */
+    z-index: 10010;
+}
 
         .bomb-grading-group {
             display: flex;
@@ -418,7 +424,7 @@
 
         <div class="tabs-container">
             <button class="tab-btn active" onclick="switchTab('rawPanel', this)">📋 待过词表 (<span id="rawCount">0</span>)</button>
-            <button class="tab-btn" onclick="switchTab('killedPanel', this)">💎 熟悉词汇 (<span id="killedCount">0</span>)</button>
+            <button class="tab-btn" onclick="switchTab('killedPanel', this)">💎 已过词表 (<span id="killedCount">0</span>)</button>
         </div>
 
         <div class="content-body">
@@ -426,10 +432,10 @@
                 <table class="word-table">
                     <thead>
                     <tr>
-                        <th>单词 (Word)</th>
-                        <th>音标 (Phonetic)</th>
-                        <th>中文释义 (Translation)</th>
-                        <th style="text-align: right;">操作 (Action)</th>
+                        <th style="width: 20%;">单词 (Word)</th>
+                        <th style="width: 15%;">音标 (Phonetic)</th>
+                        <th style="width: 35%;">中文释义 (Translation)</th>
+                        <th style="width: 30%; text-align: right; padding-right: 24px;">战术分流操作 (Actions)</th>
                     </tr>
                     </thead>
                     <tbody id="rawWordTableBody">
@@ -453,14 +459,13 @@
                         <th>单词 (Word)</th>
                         <th>音标 (Phonetic)</th>
                         <th>中文释义 (Translation)</th>
-                        <th>总过筛</th>
-                        <th>错误率</th>
-                        <th>斩杀时间</th>
+                        <th>状态 (State)</th>
+                        <th>过滤时间</th>
                         <th style="text-align: right;">操作 (Action)</th>
                     </tr>
                     </thead>
                     <tbody id="killedWordTableBody">
-                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无已斩杀的熟词</td></tr>
+                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无已过滤的熟词</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -580,16 +585,32 @@
     let currentBookId = "";
 
     // 核心数据队列
-    let burningWords = [];    // 【活跃队列】存放未满5次、处于滚动记忆状态的词
-    let frozenWords = [];     // 【熟词队列】存放已满5次、彻底冻结的熟词
+    let burningWords = [];    // 【活跃队列】存放未标记分流的初始词汇
+    let frozenWords = [];     // 【已过队列】存放已被分配到 陌生/模糊/掌握 维度的词汇
 
-    const MAX_KILL_COUNT = 5; // 触发彻底冻结的斩杀阈值
+    const MAX_KILL_COUNT = 5;
 
     let activeDisplayList = [];
     let bombList = [];
     let bombIndex = 0;
 
-    // 1. 在外部定义两个响应式引用，作为普通 JS 数组与 Vue 之间的桥梁
+
+
+
+    // =========================================================================
+// 🚀 全局战术状态底座（请焊在 Script 顶层或 Vue 的 data/methods 外部）
+// =========================================================================
+let backtrackTriggerIndex = -1;    // 触发回马枪时的物理指针位置
+let isBacktrackModeActive = false;  // 是否激活了 5 身位监控窗格
+let hasSyncedInThisWindow = false;  // 当前窗格内，自适应早鸟是否已经提前同步过
+
+let lastWordTimestamp = Date.now(); // 记录上一个单词相遇的绝对时间戳
+let accumulatedLoad = 0;           // 大脑实时认知总熵蓄水池得分
+let bombSaveTimer = null;           // 传统策略B的静默防抖闸门定时器
+
+    // 🎯【关键状态】：标记当前处于哪个标签页 ('raw' 代表待过词表，'killed' 代表已过词表)
+    let currentTab = 'raw';
+
     const rawBurningLength = Vue.ref(0);
     const rawFrozenLength = Vue.ref(0);
 
@@ -603,10 +624,9 @@
             const englishBlurTime = ref(1500);
             const chineseShowTime = ref(1000);
 
-            // 🎯【核心增加】：利用 computed 属性，自动计算并追踪两个数量的和
-           const totalWordsCount = Vue.computed(() => {
-              return rawBurningLength.value + rawFrozenLength.value;
-           });
+            const totalWordsCount = Vue.computed(() => {
+                return rawBurningLength.value + rawFrozenLength.value;
+            });
 
             const handleSizeChange = (val) => {
                 pageSize.value = val;
@@ -646,18 +666,178 @@
         sidebar.classList.toggle('collapsed');
     }
 
-    // 🌟 【核心逻辑落地】战术打分与分流控制（已闭环去重）
+    // 🌟 标签切换函数：优雅重置页码，解除分页干扰
+    function switchTab(panelId, btnEl) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        btnEl.classList.add('active');
+
+        // 精准打标切换
+        currentTab = (panelId === 'rawPanel') ? 'raw' : 'killed';
+
+        vm.currentPage = 1; // 强行重置回第一页
+        renderMainTables();
+    }
+
+ // =========================================================================
+// 🎯 核心调整 1：双表独立分页、动态切片与战术标签渲染引擎
+// =========================================================================
+function renderMainTables() {
+    rawBurningLength.value = burningWords ? burningWords.length : 0;
+    rawFrozenLength.value = frozenWords ? frozenWords.length : 0;
+
+    // 刷新顶栏大标签上的统计数字
+    document.getElementById('rawCount').innerText = rawBurningLength.value;
+    document.getElementById('killedCount').innerText = rawFrozenLength.value;
+
+    if (!currentBookId) return;
+
+    // --- 📊 独立分页计算体系 ---
+    let targetArray = (currentTab === 'raw') ? burningWords : frozenWords;
+    const totalCount = targetArray.length;
+
+    const curPage = vm.currentPage;
+    const size = vm.pageSize;
+    const totalPages = Math.ceil(totalCount / size) || 1;
+    let safePage = Math.max(1, Math.min(curPage, totalPages));
+    const start = (safePage - 1) * size;
+
+    activeDisplayList = targetArray.slice(start, start + size);
+
+    // 数据向 Vue 实例回写对齐，使 Element Plus 分页组件瞬间联动
+    vm.rawTotalCount = totalCount;
+    vm.currentPage = safePage;
+
+    // --- 📋 动态分流视图拼装 ---
+    if (currentTab === 'raw') {
+        // 【A面：待过词表】-> 只展示完全没碰过的纯净新词
+        const rawTbody = document.getElementById('rawWordTableBody');
+        if (activeDisplayList.length === 0) {
+            rawTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">🎉 这一段大盘数据已全部清洗分流完毕！</td></tr>`;
+        } else {
+            rawTbody.innerHTML = activeDisplayList.map(item => {
+                return `
+                    <tr id="row-raw-${item.word}">
+                        <td class="col-word" style="font-size: 1.05rem; font-weight: 500;">${item.word}</td>
+                        <td class="col-phonetic">
+                            ${item.phonetic || ''}
+                            <span onclick="playWordAudio('${item.word}')" style="cursor:pointer; margin-left:6px;">🔊</span>
+                        </td>
+                        <td class="col-def">${item.definition}</td>
+                        <td style="text-align: right; padding-right: 16px; white-space: nowrap;">
+                           <button class="btn btn-grade btn-stranger" style="height:32px; padding:0 12px; font-size:0.8rem; display:inline-flex; align-items:center;" onclick="tableSingleSplit('${item.word}', 'stranger')">
+                              🌋 陌生
+                           </button>
+                           <button class="btn btn-grade btn-vague" style="height:32px; padding:0 12px; font-size:0.8rem; display:inline-flex; align-items:center;" onclick="tableSingleSplit('${item.word}', 'vague')">
+                              ⚡ 模糊
+                           </button>
+                           <button class="btn btn-grade btn-mastered" style="height:32px; padding:0 12px; font-size:0.8rem; display:inline-flex; align-items:center;" onclick="tableSingleSplit('${item.word}', 'mastered')">
+                              💎 掌握
+                           </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } else {
+        // 【B面：已过词表】-> 升级展示分流后的精细化标签
+        const killedTbody = document.getElementById('killedWordTableBody');
+        if (activeDisplayList.length === 0) {
+            killedTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无已分类数据或当前页为空</td></tr>`;
+        } else {
+            killedTbody.innerHTML = activeDisplayList.map(item => {
+                const frozenDate = item.lastReview ? new Date(item.lastReview).toLocaleString() : '未知';
+                const badgeColor = item.errorRate === '0%' ? '#42b983' : '#ffa940';
+
+                // 🧠 智能匹配战术身份标签
+                let diffBadge = '';
+                if (item.difficulty === 'INIT_MASTERED' || item.difficulty === 'SMOOTH_KILL') {
+                    diffBadge = `<span style="font-size:0.75rem; margin-left:8px; padding:2px 6px; border-radius:4px; background:rgba(66,185,131,0.15); color:#42b983;">💎 掌握</span>`;
+                } else if (item.difficulty === 'INIT_VAGUE') {
+                    diffBadge = `<span style="font-size:0.75rem; margin-left:8px; padding:2px 6px; border-radius:4px; background:rgba(255,169,64,0.15); color:#ffa940;">⚡ 模糊</span>`;
+                } else if (item.difficulty === 'INIT_STRANGER') {
+                    diffBadge = `<span style="font-size:0.75rem; margin-left:8px; padding:2px 6px; border-radius:4px; background:rgba(255,77,79,0.15); color:#ff4d4f;">🌋 陌生</span>`;
+                } else {
+                    diffBadge = `<span style="font-size:0.75rem; margin-left:8px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:var(--text-muted);">🔄 回炉词</span>`;
+                }
+
+                return `
+                    <tr>
+                        <td class="checkbox-cell"><input type="checkbox" class="killed-cb" value="${item.word}"></td>
+                        <td style="font-weight:500; color:var(--text-main);">
+                            ${item.word}
+                        </td>
+                        <td>${item.phonetic || ''}</td>
+                        <td>${item.definition}</td>
+                        <td>${diffBadge}</td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem; font-family: monospace;">${frozenDate}</td>
+                        <td style="text-align:right;">
+                            <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;" onclick="singleRestore('${item.word}')">打回重刷</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+}
+
+ // =========================================================================
+// 🎯 核心调整 2：单项数据提交，注入 source: "filterPage"
+// =========================================================================
+async function tableSingleSplit(word, type) {
+    const row = document.getElementById(`row-raw-${word}`);
+    if (row) {
+        row.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+        row.style.opacity = "0.3";
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/filter/word`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                  book: currentBookId,
+                  word: word,
+                  masteryDegree: type,       // 'stranger' / 'vague' / 'mastered'
+                  source: 'filterPage' // 🎯 精确溯源：明确告知后端这是过滤页面引发的清洗
+            })
+        });
+        if (!response.ok) throw new Error('Server error');
+
+        // 重新异步加载最新大盘数据
+        const [resBurning, resFrozen] = await Promise.all([
+            fetch(`${API_BASE}/filter/list?book=${currentBookId}&status=RAW`).then(r => r.json()),
+            fetch(`${API_BASE}/filter/list?book=${currentBookId}&status=FILTERED`).then(r => r.json())
+        ]);
+        burningWords = resBurning;
+        frozenWords = resFrozen;
+
+        // 防页码越界保护
+        const maxPage = Math.ceil(burningWords.length / vm.pageSize) || 1;
+        if (vm.currentPage > maxPage) {
+            vm.currentPage = maxPage;
+        }
+
+        renderMainTables();
+    } catch (e) {
+        console.error("单项分流失败:", e);
+        if (row) row.style.opacity = "1";
+        alert("⚠️ 分流同步失败，请检查网络！");
+    }
+}
+
+    // 🌟 全屏应激打分流控制（依旧和快捷键 1, 2, Enter 完美兼容绑定）
     async function bombGrade(level) {
         if (bombList.length === 0 || bombIndex >= bombList.length) return;
 
-        // 强行清除自动滚动的定时器，防止手动干预后与自动流撞车
         if (autoLoopTimer) {
             clearTimeout(autoLoopTimer);
             autoLoopTimer = null;
         }
 
         const wordEl = document.getElementById('bWord');
-        const colors = ['#ff4d4f', '#ffa940', '#42b983']; // 红（陌生）、橙（模糊）、绿（掌握）
+        const colors = ['#ff4d4f', '#ffa940', '#42b983'];
         if (wordEl) {
             wordEl.style.transition = 'none';
             wordEl.style.color = colors[level];
@@ -670,51 +850,37 @@
         const currentWordObj = bombList[bombIndex];
 
         switch(level) {
-            case 0: // 🌋 陌生：加入临近高频复习队列
+            case 0: // 🌋 陌生：三步后闪回
                 console.log(`[${currentWordObj.word}] 标记为陌生：3步后闪回`);
-                // 后端静默同步
-                syncDifficultyWithServer(currentWordObj.word, 'hard');
-
-                // 战术插队：插到当前索引后第 3 个位置
+                syncDifficultyWithServer(currentWordObj.word, 'stranger');
                 const insertIndex = Math.min(bombIndex + 4, bombList.length);
                 bombList.splice(insertIndex, 0, { ...currentWordObj });
-
-                // 推进到下一词
                 bombNextReal();
                 break;
 
-            case 1: // ⚡ 模糊：本轮末尾重刷
+            case 1: // ⚡ 模糊：队尾追加
                 console.log(`[${currentWordObj.word}] 标记为模糊：追加至队尾`);
-                // 后端静默同步
-                syncDifficultyWithServer(currentWordObj.word, 'medium');
-
-                // 追加到当前轰炸组的末尾
+                syncDifficultyWithServer(currentWordObj.word, 'vague');
                 bombList.push({ ...currentWordObj });
-
-                // 推进到下一词
                 bombNextReal();
                 break;
 
-            case 2: // 💎 掌握：触发核心斩杀计数与过筛计算
-                console.log(`[${currentWordObj.word}] 标记为掌握：请求后端计算斩杀深度`);
+            case 2: // 💎 掌握：直接归档
+                console.log(`[${currentWordObj.word}] 标记为掌握`);
                 await executeBombKill(currentWordObj);
                 break;
         }
     }
 
-    // 核心网络同步：全屏轰炸点击“掌握”
     async function executeBombKill(wordObj) {
-        if (!wordObj.reviewCount) wordObj.reviewCount = 0;
-        wordObj.reviewCount += 1;
-
         try {
-            const response = await fetch(`${API_BASE}/filter/kill`, {
+            const response = await fetch(`${API_BASE}/filter/word`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     book: currentBookId,
                     word: wordObj.word,
-                    status: 'easy' // 标为掌握，后端自动加过筛并计错误率
+                    masteryDegree: 'master'
                 })
             });
 
@@ -726,10 +892,8 @@
             setTimeout(() => {
                 if (wordEl) wordEl.style.color = '#fff';
 
-                // 从当前的随机轰炸组里面剔除（本轮不再出现）
                 bombList.splice(bombIndex, 1);
 
-                // 越界安全防护
                 if (bombIndex >= bombList.length && bombList.length > 0) {
                     bombIndex = bombList.length - 1;
                 }
@@ -750,21 +914,20 @@
             }, 150);
 
         } catch (e) {
-            console.error("斩杀同步错误:", e);
-            alert("⚠️ 网络异常：斩杀未成功同步至后台！");
+            console.error("过滤同步错误:", e);
+            alert("⚠️ 网络异常：分类未成功同步！");
         }
     }
 
-    // 辅助函数：静默同步 陌生/模糊 状态
     async function syncDifficultyWithServer(word, difficulty) {
         try {
-            await fetch(`${API_BASE}/filter/kill`, {
+            await fetch(`${API_BASE}/filter/word`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     book: currentBookId,
                     word: word,
-                    status: difficulty
+                    masteryDegree: difficulty
                 })
             });
         } catch (e) {
@@ -775,38 +938,21 @@
     function playWordAudio(word) {
         return new Promise((resolve) => {
             if (!isAudioEnabled) return resolve();
-
-            const safeTimeout = setTimeout(() => {
-                resolve();
-            }, 2000);
-
+            const safeTimeout = setTimeout(() => { resolve(); }, 2000);
             try {
                 window.speechSynthesis.cancel();
                 const utter = new SpeechSynthesisUtterance(word);
                 utter.lang = 'en-US';
-
-                utter.onend = () => {
-                    clearTimeout(safeTimeout);
-                    resolve();
-                };
-                utter.onerror = (err) => {
-                    clearTimeout(safeTimeout);
-                    resolve();
-                };
+                utter.onend = () => { clearTimeout(safeTimeout); resolve(); };
+                utter.onerror = () => { clearTimeout(safeTimeout); resolve(); };
                 window.speechSynthesis.speak(utter);
-            } catch (e) {
-                clearTimeout(safeTimeout);
-                resolve();
-            }
+            } catch (e) { clearTimeout(safeTimeout); resolve(); }
         });
     }
 
-    // 🌟 【自动化引擎】
     async function executeAutoStep() {
         if (!isAutoMode) return;
-
         if (autoLoopTimer) clearTimeout(autoLoopTimer);
-
         if (bombIndex >= bombList.length) {
             isAutoMode = false;
             updateAutoBtnUI();
@@ -816,8 +962,6 @@
         }
 
         const current = bombList[bombIndex];
-
-        // 联动主列表
         syncMainListHighlight(current.word);
         const transEl = document.getElementById('bTrans');
 
@@ -827,50 +971,36 @@
 
         transEl.classList.remove('show');
         transEl.innerText = "";
-
         updateBombHeaderUI();
 
-        if (isAudioEnabled) {
-            await playWordAudio(current.word);
-        }
+        if (isAudioEnabled) { await playWordAudio(current.word); }
 
-        // 阶段一：【显英文】留白猜词
         autoLoopTimer = setTimeout(() => {
             if (!isAutoMode) return;
-
             if (autoShowTrans) {
                 transEl.innerHTML = formatDefinition(current.definition);
                 transEl.classList.add('show');
             }
-
-            // 阶段二：【显中文】视觉最短留白
             autoLoopTimer = setTimeout(() => {
                 if (!isAutoMode) return;
                 bombIndex++;
                 executeAutoStep();
             }, vm.chineseShowTime);
-
         }, vm.englishBlurTime);
     }
 
-    // 联动主列表定位高亮
     async function syncMainListHighlight(targetWord) {
         const index = burningWords.findIndex(item => item.word === targetWord);
         if (index === -1) return;
-
         const targetPage = Math.floor(index / vm.pageSize) + 1;
-
         if (vm.currentPage !== targetPage) {
             vm.currentPage = targetPage;
             renderMainTables();
         }
-
         setTimeout(() => {
             const rowId = `row-raw-${targetWord}`;
             const rowEl = document.getElementById(rowId);
-
             document.querySelectorAll('.highlight-row').forEach(el => el.classList.remove('highlight-row'));
-
             if (rowEl) {
                 rowEl.classList.add('highlight-row');
                 rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -880,43 +1010,26 @@
 
     function toggleAutoMode() {
         if (vm.settingVisible) return;
-
         isAutoMode = !isAutoMode;
-
         if (!isAutoMode) {
-            if (autoLoopTimer) {
-                clearTimeout(autoLoopTimer);
-                autoLoopTimer = null;
-            }
-            if (isAudioEnabled) {
-                window.speechSynthesis.cancel();
-            }
+            if (autoLoopTimer) { clearTimeout(autoLoopTimer); autoLoopTimer = null; }
+            if (isAudioEnabled) { window.speechSynthesis.cancel(); }
         }
-
         updateAutoBtnUI();
         if (document.activeElement) document.activeElement.blur();
-
-        if (isAutoMode) {
-            executeAutoStep();
-        }
+        if (isAutoMode) { executeAutoStep(); }
     }
 
     function updateAutoBtnUI() {
         const btn = document.getElementById('autoModeBtn');
         if (!btn) return;
-        if (isAutoMode) {
-            btn.innerText = "⏹️ 停止自动滚动";
-            btn.classList.add('active-loop');
-        } else {
-            btn.innerText = "🌀 开启自动滚动";
-            btn.classList.remove('active-loop');
-        }
+        btn.innerText = isAutoMode ? "⏹️ 停止自动滚动" : "🌀 开启自动滚动";
+        if (isAutoMode) btn.classList.add('active-loop'); else btn.classList.remove('active-loop');
     }
 
     function speakCurrentWord() {
         const word = document.getElementById('bWord').innerText.trim();
         if (!word || word === "Loading") return;
-
         window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(word);
         msg.lang = 'en-US';
@@ -927,28 +1040,20 @@
     function toggleAudio() {
         isAudioEnabled = !isAudioEnabled;
         document.getElementById('audioToggleBtn').innerText = isAudioEnabled ? "🔊 语音: 开" : "🔇 语音: 关";
-
-        if (!isAudioEnabled) {
-            window.speechSynthesis.cancel();
-        } else {
-            if (bombList.length > 0 && bombIndex < bombList.length) {
-                playWordAudio(bombList[bombIndex].word);
-            }
+        if (!isAudioEnabled) { window.speechSynthesis.cancel(); } else {
+            if (bombList.length > 0 && bombIndex < bombList.length) { playWordAudio(bombList[bombIndex].word); }
         }
     }
 
     function toggleTrans() {
         autoShowTrans = !autoShowTrans;
         document.getElementById('transToggleBtn').innerText = autoShowTrans ? "👁️ 中文: 开" : "🙈 中文: 关";
-
         if (document.getElementById('bombOverlay').style.display === 'flex') {
             const transEl = document.getElementById('bTrans');
             if (autoShowTrans) {
                 transEl.innerHTML = formatDefinition(bombList[bombIndex].definition);
                 transEl.classList.add('show');
-            } else {
-                transEl.classList.remove('show');
-            }
+            } else { transEl.classList.remove('show'); }
         }
     }
 
@@ -957,19 +1062,13 @@
             const res = await fetch(`${API_BASE}/import/books`);
             const books = await res.json();
             const select = document.getElementById('bookSelect');
-
             select.innerHTML = '<option value="">-- 请选择单词书 --</option>' +
                 books.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-
             if (books && books.length > 0) {
-                const firstBook = books[0];
-                select.value = firstBook.id;
+                const firstBook = books[0]; select.value = firstBook.id;
                 await selectBook(firstBook.id, firstBook.name);
             }
-        } catch (e) {
-            console.error(e);
-            alert("无法连接到Java本地后台，请确认Spring Boot已启动！");
-        }
+        } catch (e) { console.error(e); alert("无法连接到本地后台，请确认服务已启动！"); }
 
         document.getElementById('startBombBtn').addEventListener('click', startWordBomb);
         document.getElementById('selectAllKilled').addEventListener('change', (e) => {
@@ -980,222 +1079,87 @@
         window.addEventListener('keydown', handleGlobalKeydown);
     });
 
-    async function selectBook(bookId, bookName) {
-        currentBookId = bookId;
-        const titleEl = document.getElementById('currentBookName');
-        if (titleEl) titleEl.innerText = bookName;
+async function selectBook(bookId, bookName) {
+    currentBookId = bookId;
+    const titleEl = document.getElementById('currentBookName');
+    if (titleEl) titleEl.innerText = bookName;
+    try {
+        // 🚀 核心语义对齐：
+        // status=BURNING 此时在后端代表“未分流新词”
+        // status=FROZEN  此时在后端代表“已过分流词表”
+        const [resBurning, resFrozen] = await Promise.all([
+            fetch(`${API_BASE}/filter/list?book=${bookId}&status=RAW`).then(r => r.json()),
+            fetch(`${API_BASE}/filter/list?book=${bookId}&status=FILTERED`).then(r => r.json())
+        ]);
+        burningWords = resBurning;
+        frozenWords = resFrozen;
+        allWords = [...burningWords, ...frozenWords];
 
-        try {
-            // 通过 status 路由分流加载数据
-            const [resBurning, resFrozen] = await Promise.all([
-                fetch(`${API_BASE}/list?book=${bookId}&status=BURNING`).then(r => r.json()),
-                fetch(`${API_BASE}/list?book=${bookId}&status=FROZEN`).then(r => r.json())
-            ]);
-
-            burningWords = resBurning;
-            frozenWords = resFrozen;
-
-            // 获取词书全量大底（用于进度跳转锚定判断）
-            allWords = [...burningWords, ...frozenWords];
-
-            vm.currentPage = 1;
-            renderMainTables();
-        } catch (e) {
-            console.error("加载词书数据失败", e);
-        }
+        // 维持当前 Tab 面板的正常分页渲染
+        renderMainTables();
+    } catch (e) {
+        console.error("加载词书数据失败", e);
     }
+}
 
     function handleBookChange(selectElement) {
         const bookId = selectElement.value;
         const bookName = selectElement.options[selectElement.selectedIndex].text;
-
-        if (document.getElementById('bombOverlay').style.display === 'flex') {
-            exitBomb();
-        }
-
+        if (document.getElementById('bombOverlay').style.display === 'flex') { exitBomb(); }
         if (bookId) selectBook(bookId, bookName);
     }
 
-    function renderMainTables() {
-
-    // 🎯【关键同步行】：每次刷新表格或数据变动时，强行把原生 JS 数组长度塞给 Vue
-    rawBurningLength.value = burningWords ? burningWords.length : 0;
-    rawFrozenLength.value = frozenWords ? frozenWords.length : 0;
-        if (!currentBookId) return;
-
-        // 1. 计算活跃词的分页
-        const totalCount = burningWords.length;
-        const curPage = vm.currentPage;
-        const size = vm.pageSize;
-        const totalPages = Math.ceil(totalCount / size) || 1;
-        let safePage = Math.max(1, Math.min(curPage, totalPages));
-        const start = (safePage - 1) * size;
-
-        activeDisplayList = burningWords.slice(start, start + size);
-
-        vm.rawTotalCount = totalCount;
-        vm.currentPage = safePage;
-
-        document.getElementById('rawCount').innerText = totalCount;
-        document.getElementById('killedCount').innerText = frozenWords.length;
-
-        // 2. 渲染【待过词汇表】
-        const rawTbody = document.getElementById('rawWordTableBody');
-        if (activeDisplayList.length === 0) {
-            rawTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">🎉 这一段全部斩杀完毕或没有数据！</td></tr>`;
-        } else {
-            rawTbody.innerHTML = activeDisplayList.map(item => {
-                const count = item.reviewCount || 0;
-                const progressStr = "█".repeat(count) + "░".repeat(MAX_KILL_COUNT - count);
-
-                return `
-                    <tr id="row-raw-${item.word}">
-                        <td class="col-word">
-                            ${item.word}
-                            <span style="font-size:0.75rem; color:var(--accent-color); margin-left:8px; font-family:monospace;">
-                                ${progressStr} ${count}/5
-                            </span>
-                        </td>
-                        <td class="col-phonetic">
-                            ${item.phonetic || ''}
-                            <span onclick="playWordAudio('${item.word}')" style="cursor:pointer; margin-left:8px;">🔊</span>
-                        </td>
-                        <td class="col-def">${item.definition}</td>
-                        <td class="col-action">
-                           <button class="btn-action btn-kill" onclick="tableSingleKill('${item.word}')">
-                              ✓ 斩杀 +1
-                           </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // 3. 渲染【已斩杀熟词表】（完美对接 8 列大表表头）
-        const killedTbody = document.getElementById('killedWordTableBody');
-        if (frozenWords.length === 0) {
-            killedTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">暂无被斩杀的熟词</td></tr>`;
-        } else {
-            killedTbody.innerHTML = frozenWords.map(item => {
-                const frozenDate = item.lastReview ? new Date(item.lastReview).toLocaleString() : '未知';
-                const badgeColor = item.errorRate === '0%' ? '#42b983' : '#ffa940';
-
-                return `
-                    <tr>
-                        <td class="checkbox-cell"><input type="checkbox" class="killed-cb" value="${item.word}"></td>
-                        <td style="font-weight:500; color:var(--text-muted); text-decoration: line-through;">${item.word}</td>
-                        <td>${item.phonetic || ''}</td>
-                        <td>${item.definition}</td>
-                        <td style="font-family: monospace;">${item.totalCount || 0} 次</td>
-                        <td>
-                            <span style="color: ${badgeColor}; font-weight: bold; font-family: monospace;">
-                                ${item.errorRate || '0%'}
-                            </span>
-                        </td>
-                        <td style="color: var(--text-muted); font-size: 0.85rem; font-family: monospace;">${frozenDate}</td>
-                        <td style="text-align:right;">
-                            <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.8rem;" onclick="singleRestore('${item.word}')">打回重刷</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
+// =========================================================================
+// 🎯 核心调整 3：单项/批量还原，注入 source: "filterPage" 实现误触无惩罚撤销
+// =========================================================================
+async function singleRestore(word) {
+    try {
+        await fetch(`${API_BASE}/filter/restore`, { // 💡 如果你后端路由是 /filter/restore 维持不变即可
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                book: currentBookId,
+                words: [word],
+                source: 'filterPage' // 🎯 告知后端：这是过滤页面撤销，不要加 wrongCount 惩罚
+            })
+        });
+        selectBook(currentBookId, document.getElementById('currentBookName').innerText);
+    } catch (e) {
+        console.error("还原失败:", e);
     }
+}
 
-    function switchTab(panelId, btnEl) {
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(panelId).classList.add('active');
-        btnEl.classList.add('active');
+async function batchRestore() {
+    const checkedBoxes = document.querySelectorAll('.killed-cb:checked');
+    if (checkedBoxes.length === 0) return alert("请先勾选你要踢回滚动的单词！");
+    const wordsToRestore = Array.from(checkedBoxes).map(cb => cb.value);
+    try {
+        const response = await fetch(`${API_BASE}/filter/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                book: currentBookId,
+                words: wordsToRestore,
+                source: 'filterPage' // 🎯 批量无惩罚回炉
+            })
+        });
+        if (!response.ok) throw new Error('Server error');
+        document.getElementById('selectAllKilled').checked = false;
+        selectBook(currentBookId, document.getElementById('currentBookName').innerText);
+    } catch (e) {
+        console.error("批量还原失败:", e);
+        alert("⚠️ 批量还原失败，请检查网络！");
     }
-
-    // 列表手动点击斩杀 +1
-    async function tableSingleKill(word) {
-        const row = document.getElementById(`row-raw-${word}`);
-        if (row) {
-            row.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-            row.style.opacity = "0.5";
-        }
-
-        try {
-            const response = await fetch(`${API_BASE}/filter/kill`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                      book: currentBookId,
-                      word: word,
-                      status: 'easy',
-                      source: 'list' // ⚡ 注入来源特征：明确告诉后端这是由“列表点击”触发的战术动作
-                })
-            });
-            if (!response.ok) throw new Error('Server error');
-
-            // 静默拉取刷新
-            const [resBurning, resFrozen] = await Promise.all([
-                fetch(`${API_BASE}/list?book=${currentBookId}&status=BURNING`).then(r => r.json()),
-                fetch(`${API_BASE}/list?book=${currentBookId}&status=FROZEN`).then(r => r.json())
-            ]);
-            burningWords = resBurning;
-            frozenWords = resFrozen;
-            renderMainTables();
-        } catch (e) {
-            console.error("单项斩杀失败:", e);
-            if (row) row.style.opacity = "1";
-            alert("⚠️ 斩杀同步失败，请检查网络！");
-        }
-    }
-
-    async function singleRestore(word) {
-        try {
-            await fetch(`${API_BASE}/filter/restore`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ book: currentBookId, words: [word] })
-            });
-
-            // 重新刷新双队列
-            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    async function batchRestore() {
-        const checkedBoxes = document.querySelectorAll('.killed-cb:checked');
-        if (checkedBoxes.length === 0) return alert("请先勾选你要踢回滚动的单词！");
-
-        const wordsToRestore = Array.from(checkedBoxes).map(cb => cb.value);
-
-        try {
-            const response = await fetch(`${API_BASE}/filter/restore`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ book: currentBookId, words: wordsToRestore })
-            });
-            if (!response.ok) throw new Error('Server error');
-
-            document.getElementById('selectAllKilled').checked = false;
-            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
-        } catch (e) {
-            console.error("批量还原失败:", e);
-            alert("⚠️ 批量还原同步失败，请检查网络！");
-        }
-    }
+}
 
     async function startWordBomb() {
         if (activeDisplayList.length === 0) return alert("当前选择的列表中无待背单词！");
-
         let targetWord = null;
-
         try {
             const res = await fetch(`${API_BASE}/progress/load?bookId=${currentBookId}`);
             const progressData = await res.json();
-            if (progressData && progressData.lastWord) {
-                targetWord = progressData.lastWord;
-            }
-        } catch (e) {
-            console.warn("读取进度失败，从当前页开始", e);
-        }
+            if (progressData && progressData.lastWord) { targetWord = progressData.lastWord; }
+        } catch (e) { console.warn("读取进度失败，从当前页开始", e); }
 
         if (targetWord) {
             const index = burningWords.findIndex(item => item.word === targetWord);
@@ -1211,48 +1175,31 @@
         }
 
         const foundIndex = activeDisplayList.findIndex(item => item.word === targetWord);
-        // 随机打散当前分页列表
         bombList = [...activeDisplayList].sort(() => Math.random() - 0.5);
         bombIndex = (foundIndex !== -1) ? foundIndex : 0;
 
         document.getElementById('bombOverlay').style.display = 'flex';
         showBombWord(false);
         updateBombHeaderUI();
-
-        if (isAutoMode) {
-            executeAutoStep();
-        }
+        if (isAutoMode) { executeAutoStep(); }
     }
 
     function showBombWord(autoSpeak = true) {
         if (bombIndex < 0) bombIndex = 0;
         if (bombIndex >= bombList.length) {
-            if (isAutoMode) {
-                isAutoMode = false;
-                updateAutoBtnUI();
-            }
+            if (isAutoMode) { isAutoMode = false; updateAutoBtnUI(); }
             alert("🌟 恭喜！当前批次轰炸任务圆满完成！");
-            exitBomb();
-            return;
+            exitBomb(); return;
         }
-
         const current = bombList[bombIndex];
         document.getElementById('bWord').innerText = current.word;
         document.getElementById('bPhonetic').innerHTML =
             `[${current.phonetic || ''}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
         document.getElementById('bTrans').innerHTML = formatDefinition(current.definition);
 
-        if (autoSpeak) {
-            speakCurrentWord();
-        }
-
+        if (autoSpeak) { speakCurrentWord(); }
         const transEl = document.getElementById('bTrans');
-        if (autoShowTrans) {
-            transEl.classList.add('show');
-        } else {
-            transEl.classList.remove('show');
-        }
-
+        if (autoShowTrans) { transEl.classList.add('show'); } else { transEl.classList.remove('show'); }
         updateBombHeaderUI();
     }
 
@@ -1260,12 +1207,10 @@
         const selectEl = document.getElementById('bookSelect');
         const currentBookName = selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex].text : "未知词书";
         document.getElementById('bombCategory').innerText = currentBookName;
-
         const total = bombList.length;
         document.getElementById('bombRemainingCount').innerText = `剩余：${total - bombIndex}`;
         document.getElementById('bombCurrentIndex').innerText = total > 0 ? bombIndex + 1 : 0;
         document.getElementById('bombTotalCount').innerText = total;
-
         const progressPercent = total > 0 ? Math.round(((bombIndex + 1) / total) * 100) : 0;
         const bar = document.getElementById('bombProgressBar');
         if (bar) bar.style.width = progressPercent + '%';
@@ -1273,42 +1218,173 @@
 
     function playCurrentWordAudio() {
         if (bombList.length === 0 || bombIndex >= bombList.length) return;
-        const current = bombList[bombIndex];
-        if (current) playWordAudio(current.word);
+        const current = bombList[bombIndex]; if (current) playWordAudio(current.word);
     }
 
-    function bombNextReal() {
-        if (bombIndex < bombList.length - 1) {
-            bombIndex++;
-            if (isAutoMode) {
-                executeAutoStep();
-            } else {
-                showBombWord();
-                playCurrentWordAudio();
-            }
-        } else {
-            isAutoMode = false;
-            updateAutoBtnUI();
-            alert("🌟 当前批次轰炸任务圆满完成！");
-            exitBomb();
+// =========================================================================
+// ⏭️ 1. 进位控制核心（手动/自动通用切词、进词总线）
+// =========================================================================
+function bombNextReal() {
+    // 铁血同步：已击发计数器瞬间跳变跳闪，数字代表走过、看过的英文单词总数
+    totalBrushedCount++;
+    bombIndex++;
+
+    // 🚧 突破公海极限：如果弹夹刷空，触发紧急兜底补仓
+    if (bombIndex >= bombList.length) {
+        console.log("🌊 [弹夹打光] 触发最高级别空仓补仓线！");
+        fetchMoreWordsDynamic();
+        return;
+    }
+
+    // 🎯【双轨拦截之——铁血死线轨】
+    // 假设在 index 处翻车，克隆体插在 index + 5。走到 index + 4 代表第4个词刚滑过，回马枪即将撞面！
+    if (isBacktrackModeActive && bombIndex === backtrackTriggerIndex + 4) {
+        if (!hasSyncedInThisWindow) {
+            console.log("🚨 [死线强制熔断] 4号词已过，回马枪将至且中途未触发自适应同步。强制执行收网与拉新弹药！");
+            executeActualSaveAndReload();
+        }
+        // 走出回马枪高危窗格，平稳卸载监控锁
+        isBacktrackModeActive = false;
+        hasSyncedInThisWindow = false;
+    }
+
+    // 正常渲染及消费下一个单词
+    renderCurrentBombWord();
+}
+
+function renderCurrentBombWord() {
+    const current = bombList[bombIndex];
+
+    // 1. 更新 UI 单词文本
+    document.getElementById('bWord').innerText = current.word;
+    document.getElementById('bTrans').classList.remove('show');
+
+    // 2. 核心联动：单词一亮相，时间戳刷新，并立刻移交给自适应总熵总线进行行为轨迹监控
+    lastWordTimestamp = Date.now();
+    saveBombToBackend(current);
+}
+
+
+
+// =========================================================================
+// 🧠 2. 自适应认知负载总线（每切到一个词，或在此词停留时高频监听）
+// =========================================================================
+function saveBombToBackend(currentWordObject) {
+    if (!currentBookId || bombList.length === 0) return;
+
+    const now = Date.now();
+    const duration = (now - lastWordTimestamp) / 1000; // 计算在上一个单词上停留的绝对生命时间（秒）
+    lastWordTimestamp = now;
+
+    // 联动后端八维模型：映射前端实时状态惩罚权重
+    let wordWeight = 1.0;
+    if (currentWordObject && currentWordObject.difficulty) {
+        switch (currentWordObject.difficulty) {
+            case 'STUCK_LOOP':    wordWeight = 4.5; break; // 死循环卡壳词，权值顶格
+            case 'REVIVE_FALL':   wordWeight = 3.5; break; // 起死回生回炉词
+            case 'INIT_STRANGER': wordWeight = 2.0; break; // 标准生词
+            case 'INIT_VAGUE':    wordWeight = 1.5; break; // 模糊词
+            case 'SMOOTH_KILL':   wordWeight = 0.5; break; // 一路秒杀熟词，降权护盘
         }
     }
 
-    function bombNext() {
-        if (autoLoopTimer) clearTimeout(autoLoopTimer);
-        bombNextReal();
+    // 累加认知总熵
+    accumulatedLoad += duration * wordWeight;
+
+    // 🎯【双轨拦截之——智能总熵轨（自适应更早触发机制）】
+    if (accumulatedLoad >= 15) {
+        console.log(`🎯 [⚡智能自适应提前击穿] 负载得分 [${accumulatedLoad.toFixed(1)}/15]，在第 ${bombIndex - backtrackTriggerIndex} 个身位提前收网！`);
+
+        if (isBacktrackModeActive) {
+            hasSyncedInThisWindow = true; // 告诉死线拦截器：早鸟已提前同步，死线安全释放，不重复发起 I/O
+        }
+
+        executeActualSaveAndReload();
+        return;
     }
 
+    // 🛡️ 传统策略 B：静默防抖收尾闸门（防止顺风局一狂飙到底、无任何网络请求）
+    if (bombSaveTimer) clearTimeout(bombSaveTimer);
+    bombSaveTimer = setTimeout(() => {
+        // 仅仅静默保存当前快照指针，不刷新、不打乱前线弹夹顺序
+        executeActualSaveOnly();
+    }, 4000);
+}
+
+// =========================================================================
+// 🚀 3. 原子联动：瞬间固化快照并静默补仓最新八维大盘
+// =========================================================================
+async function executeActualSaveAndReload() {
+    accumulatedLoad = 0; // 蓄水池指标清零，重新捕获大脑轨迹
+    if (bombSaveTimer) clearTimeout(bombSaveTimer);
+
+    // 获取当前滑过的最新词汇状态
+    const currentWord = bombList[bombIndex];
+
+    try {
+        // 火箭 ①：瞬间将当前全屏战场指针、已击发大盘固化落库
+        await fetch(`${API_BASE}/api/words/snapshot/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                bookId: currentBookId,
+                bombIndex: bombIndex,
+                totalBrushedCount: totalBrushedCount,
+                bombList: JSON.stringify(bombList),
+                updateTime: Date.now()
+            })
+        });
+
+        // 火箭 ②：异步静默发射，向后端索要经过（遗忘度+历史错误+复习间隔）加权算好的最新 40 发硬骨头
+        const res = await fetch(`${API_BASE}/api/words/bomb/load?bookId=${currentBookId}&currentPage=${vm.currentPage}&pageSize=${vm.pageSize}`);
+        const newPayload = await res.json();
+
+        if (newPayload && newPayload.length > 0) {
+            // 核心：无缝拼接到当前弹夹的末尾！
+            // 此时前端完全不卡顿画幅，而在宏观上完成了弹药的“神不知鬼不觉”实时状态大洗牌
+            bombList = bombList.concat(newPayload);
+            console.log(`💎 [自适应补仓成功] 大盘最新状态已无缝反哺至弹夹尾部。当前总弹药量: ${bombList.length} 词`);
+        }
+    } catch (e) {
+        console.error("🔒 自适应联动落库补仓遭遇网络或I/O阻塞:", e);
+    }
+}
+
+// =========================================================================
+// ❌ 4. 触发陌生词（Level 0 / 1键）时的全套插队封锁动作
+// =========================================================================
+function handleStrangerWordTrigger() {
+    // 1. 物理克隆并强行向后瞬移 5 个身位插入
+    const currentWord = bombList[bombIndex];
+    const clone = { ...currentWord, difficulty: 'STUCK_LOOP' }; // 翻车后，状态直接在内存中升级为死循环卡壳词
+
+    bombList.splice(bombIndex + 5, 0, clone);
+    console.log(`↩️ [回马枪击发] 单词 [${currentWord.word}] 已克隆并精准空投至后方第 5 身位 (Index: ${bombIndex + 5})`);
+
+    // 2. 激活双轨自适应窗格监控锁
+    backtrackTriggerIndex = bombIndex; // 记录翻车起始锚点
+    isBacktrackModeActive = true;
+    hasSyncedInThisWindow = false;     // 重置同步状态
+
+    // 3. 瞬间排空负载蓄水池，为即将到来的 5 身位高压洗礼腾出空间
+    accumulatedLoad = 0;
+    lastWordTimestamp = Date.now();
+
+    // 4. 触发时空冻结 4 秒高清真人原声双播强化视听编码特效...
+    executeTimeFreezeEffects(currentWord.word);
+}
+
+
+
+
+
+
+    function bombNext() { if (autoLoopTimer) clearTimeout(autoLoopTimer); bombNextReal(); }
     function bombPrev() {
         if (autoLoopTimer) clearTimeout(autoLoopTimer);
         if (bombIndex > 0) {
             bombIndex--;
-            if (isAutoMode) {
-                executeAutoStep();
-            } else {
-                showBombWord();
-                playCurrentWordAudio();
-            }
+            if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
         }
     }
 
@@ -1320,83 +1396,39 @@
     async function saveProgressToBackend() {
         if (!currentBookId) return;
         const currentWord = bombList[bombIndex] ? bombList[bombIndex].word : null;
-        const payload = {
-            bookId: currentBookId,
-            lastWord: currentWord
-        };
         try {
             await fetch(`${API_BASE}/progress/save`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ bookId: currentBookId, lastWord: currentWord })
             });
-            console.log("进度已同步到后端:", payload);
-        } catch (e) {
-            console.error("保存进度失败:", e);
-        }
+        } catch (e) { console.error("保存进度失败:", e); }
     }
 
     function exitBomb() {
         saveProgressToBackend();
-
-        isAutoMode = false;
-        updateAutoBtnUI();
-        if (autoLoopTimer) {
-            clearTimeout(autoLoopTimer);
-            autoLoopTimer = null;
-        }
+        isAutoMode = false; updateAutoBtnUI();
+        if (autoLoopTimer) { clearTimeout(autoLoopTimer); autoLoopTimer = null; }
         window.speechSynthesis.cancel();
         document.getElementById('bombOverlay').style.display = 'none';
-
-        // 强力拉取最新列表，同步过筛率数据
-        if (currentBookId) {
-            selectBook(currentBookId, document.getElementById('currentBookName').innerText);
-        }
+        if (currentBookId) { selectBook(currentBookId, document.getElementById('currentBookName').innerText); }
     }
 
     function handleGlobalKeydown(e) {
         if (vm.settingVisible) return;
-
         const overlay = document.getElementById('bombOverlay');
         if (overlay.style.display !== 'flex') return;
 
-        if (e.code === 'Space') {
-            e.preventDefault();
-            toggleAutoMode();
-            return;
-        }
-
-        if (e.key === '1') {
-            e.preventDefault();
-            bombGrade(0); // 🌋 陌生
-            return;
-        } else if (e.key === '2') {
-            e.preventDefault();
-            bombGrade(1); // ⚡ 模糊
-            return;
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            bombGrade(2); // 💎 掌握 -> 直接走最新的统一过筛斩杀逻辑
-            return;
-        }
+        if (e.code === 'Space') { e.preventDefault(); toggleAutoMode(); return; }
+        if (e.key === '1') { e.preventDefault(); bombGrade(0); return; }
+        if (e.key === '2') { e.preventDefault(); bombGrade(1); return; }
+        if (e.key === 'Enter') { e.preventDefault(); bombGrade(2); return; }
 
         switch (e.code) {
-            case 'KeyQ':
-                e.preventDefault();
-                toggleTrans();
-                break;
-            case 'ArrowLeft':
-                e.preventDefault();
-                if (!isAutoMode) bombPrev();
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                if (!isAutoMode) bombNext();
-                break;
-            case 'Escape':
-                e.preventDefault();
-                exitBomb();
-                break;
+            case 'KeyQ': e.preventDefault(); toggleTrans(); break;
+            case 'ArrowLeft': e.preventDefault(); if (!isAutoMode) bombPrev(); break;
+            case 'ArrowRight': e.preventDefault(); if (!isAutoMode) bombNext(); break;
+            case 'Escape': e.preventDefault(); exitBomb(); break;
         }
     }
 </script>

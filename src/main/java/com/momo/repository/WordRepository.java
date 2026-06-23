@@ -20,16 +20,7 @@ public interface WordRepository extends JpaRepository<Word, Long> {
     // 根据书籍ID查找所有单词
     List<Word> findByBookId(String bookId);
 
-    // 根据分类查找
-    List<Word> findByCategory(String category);
 
-
-    // 🎯 铁血精准拦截：捞出所有音标为 '---' 或者为 null 的脏数据记录
-    List<Word> findByPhoneticOrPhoneticIsNull(String phonetic);
-
-
-    // 🎯 战术修正：不再盲目全表扫描，只捞出你指定的 book_id 下面被污染的 5000 多个词
-    // 或者只捞出真实的考研大盘词书（把 "你的bookId" 传进来，或者直接全量限制）
     @Query("SELECT w FROM Word w WHERE (w.phonetic = '---' OR w.phonetic IS NULL) AND w.bookId IS NOT NULL")
     List<Word> findActualDirtyWords();
 

@@ -163,6 +163,34 @@
             align-items: center;
         }
 
+        /* 快捷操作区样式 */
+        .editor-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0 14px;
+            height: 30px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: none;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--theme-accent);
+            box-shadow: 0 0 8px var(--theme-glow);
+        }
+
         /* 左侧：编辑器区域 */
         textarea {
             width: 100%;
@@ -185,7 +213,7 @@
             box-shadow: 0 0 12px var(--theme-glow);
         }
 
-        /* 右侧：渲染预览区 (带呼吸感边框模拟最终出图成片) */
+        /* 右侧：渲染预览区 */
         .preview-body {
             flex: 1;
             background: rgba(10, 10, 12, 0.9);
@@ -197,7 +225,7 @@
             transition: border-color 0.3s;
         }
 
-        /* Markdown 内置标签基础样式渲染渲染 */
+        /* Markdown 内置标签基础样式渲染 */
         .preview-body h1, .preview-body h2, .preview-body h3 {
             color: var(--theme-accent);
             margin-bottom: 12px;
@@ -206,19 +234,129 @@
         .preview-body h1 { font-size: 1.6rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;}
         .preview-body h2 { font-size: 1.3rem; }
         .preview-body p { font-size: 0.95rem; line-height: 1.7; color: #d1d1d6; margin-bottom: 10px; }
+
+        /* 核心适配：优雅的图片容器及阴影排版 */
+        .preview-body img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 14px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            display: block;
+        }
+
         .preview-body code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: var(--theme-accent); }
         .preview-body pre { background: #1e1e24; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 10px 0; }
         .preview-body ul, .preview-body ol { padding-left: 20px; margin-bottom: 10px; color: #d1d1d6; }
         .preview-body blockquote { border-left: 4px solid var(--theme-accent); padding-left: 12px; color: var(--text-muted); font-style: italic; margin: 10px 0; }
 
-        /* 使得 Preview 中的 KaTeX 公式块能完美居中排版且不产生白块 */
-        .katex-display {
-            margin: 12px 0;
-            overflow-x: auto;
-            overflow-y: hidden;
-            color: var(--theme-accent);
-        }
+/* 确保数学公式在任何分辨率和导出时都能完美居中、不换行且不被截断 */
+.preview-body .katex-display {
+    margin: 24px 0;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02); /* 淡淡的半透明背景，增加公式卡片感 */
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--theme-accent); /* 自动跟随你切换的 Gemini蓝/赛博朋克/矩阵绿 主题色 */
+    text-align: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.2);
+}
 
+/* 针对公式中的中文进行无缝微调，防止字体突兀 */
+.katex .text {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif !important;
+    font-weight: 500;
+    font-size: 0.95em; /* 中文字体稍微缩小一点，与数学符号比例更协调 */
+    padding: 0 4px;    /* 为“或”字两边留出极小的呼吸间距 */
+}
+/* ==========================================
+   高级表格（Table）像素级美化排版
+   ========================================== */
+.preview-body table {
+    width: 100%;
+    border-collapse: separate; /* 改为 separate 以支持圆角效果 */
+    border-spacing: 0;
+    margin: 20px 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden; /* 确保圆角能切掉内部直角 */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* 表头样式：带有微弱的主题色渐变与投影 */
+.preview-body th {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+    color: var(--theme-accent); /* 核心关键：自动跟随 Gemini蓝/赛博/矩阵 主题色切换 */
+    font-weight: 600;
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    letter-spacing: 0.5px;
+}
+
+/* 单元格基础样式 */
+.preview-body td {
+    padding: 14px 16px;
+    color: #d1d1d6;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: top; /* 文字靠上对齐，多行排版时更美观 */
+}
+
+/* 斑马纹：让奇数行和偶数行产生微妙的深浅交替，极大提升长表格可读性 */
+.preview-body tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.015);
+}
+
+/* 鼠标悬停或后端加亮态：当前行隐隐发光 */
+.preview-body tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+    color: #ffffff;
+    transition: background 0.2s ease;
+}
+
+/* 移除最后一行没有必要的底边框 */
+.preview-body tr:last-child td {
+    border-bottom: none;
+}
+
+/* 针对表格中强调加粗语法 (**加粗**) 的颜色微调 */
+.preview-body td strong {
+    color: #ffffff;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+/* 优化单元格内的换行排版，使其带有列表感 */
+.preview-body td br {
+    display: block;
+    margin-top: 6px;
+    content: "";
+}
+
+/* 针对表格内 Emoji 图标和警示语的微调，增加视觉呼吸感 */
+.preview-body td strong {
+    color: #ffffff;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    display: inline-block; /* 让带状态的加粗文字变成精致的小标签 */
+    margin: 2px 0;
+}
+
+/* 特别突出核心原因中的“翻塘”和“严重缺氧”等高危警示词 */
+.preview-body td em, .preview-body td strong:contains("绝对") {
+    color: var(--theme-accent);
+    font-style: normal;
+}
         /* 动作面板 */
         .control-panel {
             display: flex;
@@ -293,7 +431,13 @@
     <div class="workspace">
         <div class="card">
             <div class="card-header">
-                <span>MD 源码编辑器</span>
+                <div class="editor-actions">
+                    <span>MD 源码编辑器</span>
+                    <input type="file" id="localImgInput" accept="image/*" style="display: none;" onchange="importLocalImage(this)">
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('localImgInput').click()">
+                        📷 插入本地图片
+                    </button>
+                </div>
                 <span id="char-count">字数: 0</span>
             </div>
             <textarea id="md" placeholder="在此处键入您的 Markdown，右侧会实时完成渲染..." autocomplete="off" spellcheck="false"># 智能记忆算法技术大纲
@@ -306,7 +450,7 @@ $$
 T_{\text{circle}} = Q_{\text{size}} \times t_{\text{bomb}} = 20 \times 3s = 60s
 $$
 
-> 提示：1分钟的延迟，刚好让一个单词从大脑的“瞬时视觉留存”进入“短时提取阶段”，通过 $\mu\text{-SRS}$ 神经网络可以强化记忆神经元的建立。</textarea>
+> 提示：点击上方的 “插入本地图片” 按钮可以植入本机的图片。Base64文本会和普通MD语法混合传送，后端能完美识别并跟随成片一起导出！</textarea>
         </div>
 
         <div class="card">
@@ -332,14 +476,24 @@ $$
     const mdInput = document.getElementById("md");
     const previewDiv = document.getElementById("preview");
     const charCount = document.getElementById("char-count");
-    let currentTheme = "gemini"; // 默认当前主题
+    let currentTheme = "gemini";
+
+    // ==========================================
+    // 核心：初始化前端隐形图片库 (内存 Map)
+    // ==========================================
+    window.localImages = new Map();
+
+    // 显式配置 marked.js 解析图片规则
+    marked.setOptions({
+        gfm: true,
+        breaks: true
+    });
 
     // 1. 多模板主题切换控制
     function switchTheme(themeName) {
         currentTheme = themeName;
         document.documentElement.setAttribute('data-theme', themeName);
 
-        // 更新小圆点高亮状态
         document.querySelectorAll('.theme-dot').forEach(dot => {
             dot.classList.remove('active');
         });
@@ -347,30 +501,98 @@ $$
         if (activeDot) activeDot.classList.add('active');
     }
 
-    // 2. 纯前端 Markdown 实时解析与渲染逻辑
+    // ==========================================
+    // 2. 升级版：纯净图片插入（内存映射法）
+    // ==========================================
+    function importLocalImage(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast("请选择有效的图片文件！", true);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Data = e.target.result;
+
+            // 1. 生成唯一的不重复图片 ID 别名
+            const imageId = `local_img_${Date.now().toString().slice(-6)}`;
+
+            // 2. 将 Base64 数据直接塞进隐形图片库，不污染 textarea
+            window.localImages.set(imageId, base64Data);
+
+            // 3. 组装插入光标处的“简短占位符”
+            const shortMarkdown = `![本地图片][${imageId}]`;
+
+            // 4. 处理光标位置，将简短占位符插入当前书写行
+            const startPos = mdInput.selectionStart;
+            const endPos = mdInput.selectionEnd;
+            const textBefore = mdInput.value.substring(0, startPos);
+            const textAfter = mdInput.value.substring(endPos);
+
+            // 5. 核心组装：不再拼接 footerDefinition，文档极致纯净
+            mdInput.value = textBefore + shortMarkdown + textAfter;
+
+            // 6. 将光标定位在占位符之后
+            mdInput.selectionStart = mdInput.selectionEnd = startPos + shortMarkdown.length;
+
+            // 7. 触发渲染、垃圾回收并清空控件
+            gcImages();
+            renderMarkdown();
+            showToast("图片已存入隐形库，编辑框保持清爽！");
+            input.value = '';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ==========================================
+    // 2.5 隐形库内存垃圾回收（GC），防止内存泄漏
+    // ==========================================
+    function gcImages() {
+        const currentText = mdInput.value;
+        // 遍历当前的内存库，如果编辑区里已经把这个 [local_img_xxxx] 删了，就从内存释放它
+        for (let imageId of window.localImages.keys()) {
+            if (!currentText.includes(`[${imageId}]`)) {
+                window.localImages.delete(imageId);
+                console.log(`[GC] 释放了无用图片内存: ${imageId}`);
+            }
+        }
+    }
+
+    // 3. 纯前端 Markdown 实时解析与渲染逻辑
     function renderMarkdown() {
         let rawMarkdown = mdInput.value;
         charCount.innerText = `字数: ${rawMarkdown.length}`;
 
-        // 先用 marked 解析基础语法
-        let htmlContent = marked.parse(rawMarkdown);
+        // 【关键改动】渲染预览前，动态把内存库里的 Base64 拼给 marked.js
+        let compileText = rawMarkdown;
+        window.localImages.forEach((base64, imageId) => {
+            compileText += `\n\n[${imageId}]: ${base64}`;
+        });
 
-        // 先把渲染好的 HTML 塞进预览区
+        let htmlContent = marked.parse(compileText);
         previewDiv.innerHTML = htmlContent;
 
-        // 核心修复点：此时 renderMathInElement 已经有效，调用它自动解析预览区内的数学公式
         if (typeof renderMathInElement === "function") {
             renderMathInElement(previewDiv, {
                 delimiters: [
                     {left: '$$', right: '$$', display: true},
                     {left: '$', right: '$', display: false}
                 ],
-                throwOnError: false // 防止错误的公式语法导致解析崩溃
+                throwOnError: false
             });
         }
+
+       // 如果想在打字渲染后也保持对齐，可在 renderMarkdown 结尾加入：
+const scrollPercentage = mdInput.scrollTop / (mdInput.scrollHeight - mdInput.clientHeight);
+previewDiv.scrollTop = scrollPercentage * (previewDiv.scrollHeight - previewDiv.clientHeight);
+
+
     }
 
-    // 3. 性能优化：引入防抖（Debounce），避免连续打字时解析造成页面卡顿
+    // 4. 性能优化：防抖
     function debounce(fn, delay = 300) {
         let timeout;
         return function () {
@@ -379,9 +601,13 @@ $$
         };
     }
 
-    mdInput.addEventListener('input', debounce(renderMarkdown, 250));
+    // 在用户输入时，同时触发渲染与垃圾回收
+    mdInput.addEventListener('input', debounce(() => {
+        gcImages();
+        renderMarkdown();
+    }, 250));
 
-    // 4. 编辑器增强：允许使用 Tab 键缩进
+    // Tab 键智能缩进
     mdInput.addEventListener('keydown', function(e) {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -402,7 +628,9 @@ $$
         setTimeout(() => toast.classList.remove("show"), 2500);
     }
 
-    // 5. 核心下载与后端请求逻辑（带上当前选中的主题参数）
+    // ==========================================
+    // 5. 核心下载：发送前还原 Base64 数据投喂给后端
+    // ==========================================
     async function downloadImage() {
         const markdown = mdInput.value;
         if (!markdown.trim()) {
@@ -418,15 +646,22 @@ $$
         btnSpinner.style.display = "inline-block";
         btnText.innerText = "后端渲染中...";
 
+        // 【终极组合】将纯净的文档内容 + 隐形库里正在被引用的 Base64 整合在一起发走
+        let finalPayload = markdown;
+        window.localImages.forEach((base64, imageId) => {
+            if (markdown.includes(`[${imageId}]`)) {
+                finalPayload += `\n\n[${imageId}]: ${base64}`;
+            }
+        });
+
         try {
-            // 在请求头中额外加入当前选中的“主题色名称”，方便后端动态调配底色和高亮色
             let response = await fetch("/api/markdown/image", {
                 method: "POST",
                 headers: {
                     "Content-Type": "text/plain",
-                    "X-Render-Theme": currentTheme // 传给后端识别的主题参数
+                    "X-Render-Theme": currentTheme
                 },
-                body: markdown
+                body: finalPayload // 后端收到的仍是标准且能完美出图的带 Base64 的 MD
             });
 
             if (!response.ok) throw new Error("服务器生成失败");
@@ -451,8 +686,46 @@ $$
             btnText.innerText = "导出高清图片";
         }
     }
+// ==========================================
+// 核心：左右联动同步滚动（带防循环锁机制）
+// ==========================================
+let isSyncingLeftScroll = false;
+let isSyncingRightScroll = false;
 
-    // 初始化运行一次，渲染默认数据
+// 左边（Textarea）滚动时，联动右边（Preview）
+mdInput.addEventListener('scroll', () => {
+    if (isSyncingLeftScroll) {
+        isSyncingLeftScroll = false;
+        return;
+    }
+
+    // 激活右侧的锁，防止右侧的 scroll 事件反过来触发左侧
+    isSyncingRightScroll = true;
+
+    // 计算滚动的百分比
+    const scrollPercentage = mdInput.scrollTop / (mdInput.scrollHeight - mdInput.clientHeight);
+
+    // 按比例设置右侧的滚动距离
+    previewDiv.scrollTop = scrollPercentage * (previewDiv.scrollHeight - previewDiv.clientHeight);
+});
+
+// 右边（Preview）滚动时，联动左边（Textarea）
+previewDiv.addEventListener('scroll', () => {
+    if (isSyncingRightScroll) {
+        isSyncingRightScroll = false;
+        return;
+    }
+
+    // 激活左侧的锁，防止左侧的 scroll 事件反过来触发右侧
+    isSyncingLeftScroll = true;
+
+    // 计算滚动的百分比
+    const scrollPercentage = previewDiv.scrollTop / (previewDiv.scrollHeight - previewDiv.clientHeight);
+
+    // 按比例设置左侧的滚动距离
+    mdInput.scrollTop = scrollPercentage * (mdInput.scrollHeight - mdInput.clientHeight);
+});
+    // 初始化默认数据
     renderMarkdown();
 </script>
 

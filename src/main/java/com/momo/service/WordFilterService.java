@@ -76,13 +76,13 @@ public class WordFilterService {
      * @param words  需要打回的单词列表
      */
     @Transactional
-    public void restoreWords(String bookId, List<String> words, String source) {
+    public void restoreWords(Long userId,String bookId, List<String> words, String source) {
         if (words == null || words.isEmpty()) {
             return; // 战术空检，防止空指针
         }
         // ⚡ 地毯式循环遍历处理每一个要回炉的单词
         for (String word : words) {
-            Optional<WordRelation> relationOpt = wordRelationRepository.findByBookIdAndWord(bookId, word);
+            Optional<WordRelation> relationOpt = wordRelationRepository.findByUserIdAndBookIdAndWord(userId,bookId, word);
             if (relationOpt.isPresent()) {
                 WordRelation record = relationOpt.get();
                 wordRelationRepository.delete(record);
@@ -128,12 +128,13 @@ public class WordFilterService {
      *
      */
     @Transactional
-    public void processWordReview(String bookId, String word, String  masteryDegree, String source) {
-        WordRelation record = wordRelationRepository.findByBookIdAndWord(bookId, word)
+    public void processWordReview(Long userId, String bookId, String word, String masteryDegree, String source) {
+        WordRelation record = wordRelationRepository.findByUserIdAndBookIdAndWord(userId,bookId, word)
                 .orElseGet(() -> {
                     WordRelation newRecord = new WordRelation();
                     newRecord.setBookId(bookId);
                     newRecord.setWord(word);
+                    newRecord.setUserId(userId);
                     newRecord.setReviewCount(0);
                     newRecord.setWrongCount(0);
                     newRecord.setStatus("BURNING");
@@ -200,11 +201,8 @@ public class WordFilterService {
                 }
             }
         }
-
+        record.setUserId(userId);
         record.setLastReview(System.currentTimeMillis());
         wordRelationRepository.save(record);
     }
-
-
-
 }

@@ -26,6 +26,9 @@ public class WordRelation {
 
     private String word;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     private int streak;         // 突击大循环中连续正确计数器 (0-3，满3次在前端物理剔除)
 
     /**
@@ -71,7 +74,7 @@ public class WordRelation {
     private String difficulty;
 
     @Column(name = "difficulty_aa")
-    private double difficultyAa;
+    private Double difficultyAa;
 
 
     /**
@@ -96,7 +99,7 @@ public class WordRelation {
      */
     private Integer familiarDepth = 0;
 
-    private double stability = 2.0;          // 2. 记忆稳定度 (Stability, 单位：天，初始生词给2天)
+    private Double stability = 2.0;          // 2. 记忆稳定度 (Stability, 单位：天，初始生词给2天)
 
     private Long sessionLastActiveTime;
 
@@ -113,6 +116,14 @@ public class WordRelation {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getBookId() {
@@ -195,19 +206,19 @@ public class WordRelation {
         this.streak = streak;
     }
 
-    public double getStability() {
+    public Double getStability() {
         return stability;
     }
 
-    public void setStability(double stability) {
+    public void setStability(Double stability) {
         this.stability = stability;
     }
 
-    public double getDifficultyAa() {
+    public Double getDifficultyAa() {
         return difficultyAa;
     }
 
-    public void setDifficultyAa(double difficultyAa) {
+    public void setDifficultyAa(Double difficultyAa) {
         this.difficultyAa = difficultyAa;
     }
 

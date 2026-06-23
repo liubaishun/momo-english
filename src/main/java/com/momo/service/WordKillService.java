@@ -1,6 +1,5 @@
 package com.momo.service;
 
-import com.momo.controller.WordBombSnapshotController;
 import com.momo.dto.WordKillProjection;
 import com.momo.dto.WordVO;
 import com.momo.model.WordRelation;
@@ -34,63 +33,221 @@ public class WordKillService {
     @Autowired
     private WordRelationRepository wordRelationRepository; // 或者是你的 JPA Repository    @Autowired
 
+    @Autowired
     private RollingRefuelEngine refuelEngine; // 或者是你的 JPA Repository
 
     @Transactional
-    public void processWordReview(String bookId, String word, String masteryDegree, String source) {
+    public void processWordReview(String bookId, String word, String masteryDegree, int currentTick, Long userId) {
 
-        WordKillProjection p = wordRelationRepository.findKillWord(bookId,word);
+        // 1. 获取最新大盘原始投影
+        WordKillProjection p = wordRelationRepository.findKillWordByUserId(userId, bookId, word);
+        if (p == null) {
+            return; // 极端防御性降级
+        }
+
+        long now = System.currentTimeMillis();
+        String degree = Optional.ofNullable(masteryDegree).orElse("").toUpperCase();
+
+        // 🎯 【核心改动】：持久化降维。优先从引擎的内存脏池里取，取不到再去查 DB，实现内存防穿透
+        String dirtyKey = bookId + ":" + word;
+        WordRelation relation = refuelEngine.getDirtyRelationMap().computeIfAbsent(dirtyKey, k ->
+                wordRelationRepository.findByUserIdAndBookIdAndWord(userId,bookId, word).orElseGet(() -> {
+                    WordRelation newRel = new WordRelation();
+                    newRel.setBookId(bookId);
+                    newRel.setWord(word);
+                    newRel.setStability(2.0);
+                    newRel.setDifficultyAa(50.0);
+                    newRel.setStatus("BURNING");
+                    newRel.setReviewCount(0);
+                    newRel.setWrongCount(0);
+                    return newRel;
+                })
+        );
+        relation.setReviewCount((relation.getReviewCount() != null ? relation.getReviewCount() : 0) + 1);
+        relation.setLastReview(now);
+
+        Map<String, WordVO> userCache = refuelEngine.getUserCacheSnapshot(String.valueOf(userId));
+        List<WordVO> retaliationBuffer = refuelEngine.getState(userId, bookId).getRetaliationBuffer();
+        // 🎯 核心防死锁：提前计算出当前常规大盘可以参与排阵的候选词基数（剔除已被雷锁定的词）
+        Set<String> currentlyLockedWords = retaliationBuffer.stream().map(WordVO::getWord).collect(Collectors.toSet());
+        int estimatedBaseSize = (int) retaliationBuffer.stream().filter(v -> !currentlyLockedWords.contains(v.getWord())).count();
+
+        int remainingSteps = 0;
+        if (userCache != null && !userCache.isEmpty()) {
+            List<Map.Entry<String, WordVO>> entries;
+            synchronized (userCache) {
+                entries = new ArrayList<>(userCache.entrySet());
+            }
+            // 缓存积压长度:当前缓存中存在的陌生、模糊 等词的长度;
+            remainingSteps = entries.size();
+        }
+
 
         // 计算衍生战术指标：动态错误率
         int total = Optional.ofNullable(p.getTotalCount()).orElse(0);
         int wrong = Optional.ofNullable(p.getWrongCount()).orElse(0);
+        int totalWrong = Optional.ofNullable(p.getTotalWrongCount()).orElse(0);
+        String errorRate = total > 0 ? String.format("%.0f%%", ((double) wrong / total) * 100) : "0%";
 
-        String errorRate = "0%";
+        // 2. 完美对应 WordVO 的全参构造器 (其中 streak 默认注入 0)
+        WordVO vo = new WordVO(p.getWord(), p.getPhonetic(), p.getDefinition(), p.getReviewCount(), p.getStatus(),
+                p.getDifficulty(), p.getDifficultyAa(), p.getLastReview(), total, errorRate, 0,
+                wrong, totalWrong, 1, 0, 0, 0, 0);
 
-        // 3. 完美对应 WordVO 的全参构造器 (其中 streak 默认注入 0，等待进入全屏滚动时被接管)
-        WordVO vo = new WordVO(p.getWord(), p.getPhonetic(), p.getDefinition(), p.getReviewCount(), p.getStatus(), p.getDifficulty(), p.getDifficultyAa(), p.getLastReview(), total, errorRate, 0, // streak 初始值
-                wrong, p.getTotalWrongCount(), 1, 0, 0, 0, 0);
+        // 🚀 初始化设定：咬住前端当前的真理发射刻度
+        vo.setTriggerTargetIndex(currentTick);
 
-        String cacheKey = bookId + ":" + word;
-        long now = System.currentTimeMillis();
-        // 极速注入前线内存池，折叠I/O
-        if (masteryDegree != null) {
-            switch (masteryDegree.toUpperCase()) {
-                case "STRANGER": // 🌋 陌生：5词后必杀回马枪
-                    vo.setTriggerTargetIndex(5);
-                    // 🌋 一级强化：完全不会，插队+5位置。有效期 30 分钟
-                    vo.setLoopStage(1);
-                    vo.setExpireTimestamp(now + (30 * 60 * 1000));
-                    break;
-                case "VAGUE":    // 🟡 模糊：10词后回马枪
-                    // 🟡 二级强化：模糊认识，插队+10位置。有效期 6 小时
-                    vo.setLoopStage(2);
-                    vo.setExpireTimestamp(now + (6 * 60 * 60 * 1000));
-                    vo.setTriggerTargetIndex(10);
-                    break;
-                case "EASY": // 🟢 熟悉：30词后回马枪（留空位供后续非常熟悉演化）
-                    // 🟢 三级强化：从二级回马枪挺过来的熟词审计，插队+20位置。有效期 24 小时
-                    if (vo.getLoopStage() == 2) {
-                        vo.setLoopStage(3);
-                        vo.setExpireTimestamp(now + (24 * 60 * 60 * 1000));
-                        vo.setTriggerTargetIndex(30);
-                    }
-                    break;
-                case "PREV": // 🟢 熟悉：30词后回马枪（留空位供后续非常熟悉演化）
-                    // 🟢 三级强化：从二级回马枪挺过来的熟词审计，插队+20位置。有效期 24 小时
-                    refuelEngine.handleRollbackFeedback(bookId,word);
-                    break;
-                case "NEXT": // 🟢 熟悉：30词后回马枪（留空位供后续非常熟悉演化）
-                    // 🟢 三级强化：从二级回马枪挺过来的熟词审计，插队+20位置。有效期 24 小时
-                    refuelEngine.handleUserClickFeedback(bookId,vo);
-                    break;
-                default:
-                    vo.setTriggerTargetIndex(-1); // 无需强化
-                    break;
+
+        long expireDuration = 0L;
+        double diffRatio = (p.getDifficultyAa() != null ? p.getDifficultyAa() : 50.0) / 100.0;
+
+        // 错峰相对步长偏移量（默认 0：如果不进地雷缓冲区则不产生偏移）
+        int stepOffset = 0;
+
+        // 3. 极速注入演化矩阵（同时同步给 VO 快照和 数据库Relation）
+        switch (degree) {
+            case "STRANGER": // 🌋 陌生：5词后必杀回马枪
+                stepOffset = 5;
+                vo.setLoopStage(1);
+
+                relation.setWrongCount(wrong + 1);
+                relation.setStability(Math.max(0.4, (p.getStability() != null ? p.getStability() : 2.0) * 0.30));
+                relation.setDifficultyAa(Math.min(100.0, (p.getDifficultyAa() != null ? p.getDifficultyAa() : 50.0) + 15.0));
+                expireDuration = 15 * 60 * 1000L; // 15分钟有效期
+                break;
+
+            case "VAGUE":    // 🟡 模糊：10词后回马枪
+                stepOffset = 10;
+                vo.setLoopStage(2);
+
+                relation.setWrongCount(wrong + 1); // 模糊也按错词高危算
+                relation.setStability(Math.max(0.8, (p.getStability() != null ? p.getStability() : 2.0) * 0.70));
+                relation.setDifficultyAa(Math.min(100.0, (p.getDifficultyAa() != null ? p.getDifficultyAa() : 50.0) + 4.0));
+                expireDuration = 2 * 60 * 60 * 1000L; // 2小时
+                break;
+
+            case "FAMILIAR": // 🌀 自动滚动或常规滑行
+                stepOffset = 0;
+
+                relation.setWrongCount(Math.max(0, wrong - 1));
+                double familiarGrowth = 1.6 - (diffRatio * 0.4);
+                relation.setStability((p.getStability() != null ? p.getStability() : 2.0) * Math.max(1.2, familiarGrowth));
+                relation.setDifficultyAa(Math.max(0.0, (p.getDifficultyAa() != null ? p.getDifficultyAa() : 50.0) - 5.0));
+                expireDuration = 12 * 60 * 60 * 1000L; // 12小时
+                break;
+
+            case "EASY":     // 🟢 熟词审计（30词后回马枪抽查）
+                stepOffset = 30;
+                vo.setLoopStage(3);
+
+                relation.setWrongCount(0);
+                double easyGrowth = 3.0 - (diffRatio * 1.0);
+                relation.setStability((p.getStability() != null ? p.getStability() : 2.0) * Math.max(2.0, easyGrowth));
+                relation.setDifficultyAa(Math.max(0.0, (p.getDifficultyAa() != null ? p.getDifficultyAa() : 50.0) - 15.0));
+                expireDuration = 72 * 60 * 60 * 1000L; // 72小时
+                break;
+
+            case "PREV":
+                refuelEngine.handleRollbackFeedback(bookId, userId + "", word, userId);
+                return;
+
+            case "NEXT":
+                refuelEngine.handleUserClickFeedback(bookId, userId + "", vo);
+                return;
+
+            default:
+                vo.setTriggerTargetIndex(-1);
+                break;
+        }
+
+        // =========================================================================
+        // 🛰️ 【平替落库】：极速注入内存脏池，不阻塞当前 HTTP 请求
+        // =========================================================================
+        refuelEngine.stageDirtyRelation(bookId, word, relation);
+
+        // =========================================================================
+        // 🛰️ 【借鉴融合点二】：联动引擎自适应 Stride，注入绝对真理时空阵位
+        // =========================================================================
+        // 传入刚保存的最新稳定性，让引擎计算自适应智能步长（基础词剩余传 0，等引擎二次修正）
+        int stride = refuelEngine.calculateAdaptiveStride(relation.getStability(), degree, remainingSteps, estimatedBaseSize);
+
+        // 🎯 核心防覆盖修正线：
+        // 如果是无埋雷意图的词（adaptiveStride返回-1），或者自动滑行的词，则直接赋予负分（直接进常规大盘，不埋雷）
+        if (stride <= 0 || stepOffset == 0) {
+            vo.setTriggerTargetIndex(-1);
+        } else {
+            // 💥 时空裂变：以 stride 为主，如果它发生了防死锁压缩，以它为准；否则用我们基础设定的 stepOffset
+            int finalStride = Math.min(stepOffset, stride);
+
+            // 🚀 终极真理公式：当前前端真实所在的步数 + 最终收缩步长 = 后端格子的物理捕获点
+            vo.setTriggerTargetIndex(currentTick + finalStride);
+        }
+
+        vo.setExpireTimestamp(now + expireDuration);
+
+        // 4. 将最新计算出的演化数值反哺进 WordVO 快照中，保证缓存和大盘的一致性
+        vo.setStability(relation.getStability());
+        vo.setDifficultyAa(relation.getDifficultyAa());
+        vo.setWrongCount(relation.getWrongCount());
+        vo.setDifficulty(degree); // 将本次动作暂存
+
+        // 🎯 写入高速前线内存池，等待 /bomb/load 一枪提走
+        refuelEngine.cacheWordSnapshot(userId + "", bookId, vo.getWord(), vo);
+    }
+
+
+    @Transactional
+    public void killordReview(Long userId,String bookId, String word, String masteryDegree, String source) {
+        WordRelation record = wordRelationRepository.findByUserIdAndBookIdAndWord(userId,bookId, word)
+                .orElseGet(() -> {
+                    WordRelation newRecord = new WordRelation();
+                    newRecord.setBookId(bookId);
+                    newRecord.setWord(word);
+                    newRecord.setReviewCount(0);
+                    newRecord.setWrongCount(0);
+                    newRecord.setStatus("BURNING");
+                    return newRecord;
+                });
+
+        int currentReviewCount = record.getReviewCount() != null ? record.getReviewCount() : 0;
+        int currentWrongCount = record.getWrongCount() != null ? record.getWrongCount() : 0;
+
+
+        if ("mastered".equals(masteryDegree)) {
+            int newReviewCount = currentReviewCount + 1;
+            record.setReviewCount(newReviewCount);
+
+            // 🎯 触发通关生死线判定（满 5 次）
+            if (newReviewCount >= 5) {
+                record.setStatus("FROZEN"); // 晋升冻结舱熟词
+
+                if (currentWrongCount == 0) {
+                    record.setDifficulty("SMOOTH_KILL"); // 顺畅斩杀
+                } else if (currentWrongCount <= 3) {
+                    record.setDifficulty("NORMAL_KILL"); // 常规斩杀
+                } else {
+                    record.setDifficulty("HARD_KILL");   // 惨烈斩杀（后续重点抽查）
+                }
+            } else {
+                record.setStatus("BURNING"); // 没满 5 次，继续留在燃烧区
+            }
+        } else if ("wrong".equals(masteryDegree)) {
+            // 吃到马枪，错词率累加
+            record.setWrongCount(currentWrongCount + 1);
+            record.setStatus("BURNING");
+
+            // ⚡【核心血条惩罚机制】：如果是在斩杀阶段（killPage）答错，
+            // 必须剥夺其部分甚至全部 reviewCount，防止钻空子闪现通关
+            if ("killPage".equals(source)) {
+                // 惩罚策略：斩杀页答错，血条直接打回 0 次或 1 次（这里采用清零，实施铁血重训）
+                record.setReviewCount(0);
+                record.setDifficulty("RE_TRAINING"); // 标记为再训死磕词
             }
         }
-        WordBombSnapshotController.syncCachePool.put(cacheKey, vo);
+        record.setLastReview(System.currentTimeMillis());
+        wordRelationRepository.save(record);
     }
+
 
     /**
      * 🚀 战术总装：为前端生成/补仓 20 词核心轰炸弹夹 (Omnipotent Queue Generator)
@@ -328,168 +485,69 @@ public class WordKillService {
      * @param bookId 书籍ID
      * @param status 'BURNING' 代表待背词，'FROZEN' 代表已背词
      */
-    public List<WordVO> getKillPageWords(String bookId, String status) {
+    public List<WordVO> getKillPageWords(String bookId, String status,Long userId) {
         // 1. 一枪轰出，拿到的直接是强类型、带属性名映射的持久化投影
-        List<WordKillProjection> rawProjections = wordRelationRepository.findKillPageWordsRaw(bookId, status);
+        List<WordKillProjection> rawProjections = wordRelationRepository.findKillPageWordsRaw(userId,bookId, status);
         List<WordVO> voList = new ArrayList<>();
 
-        // 2. 流式防御转换：利用全参构造函数优雅总装
         for (WordKillProjection p : rawProjections) {
-            // 计算衍生战术指标：动态错误率
-            int total = p.getTotalCount() != null ? p.getTotalCount() : 0;
-            int wrong = p.getWrongCount() != null ? p.getWrongCount() : 0;
+            if (p == null) continue;
 
+            WordVO vo = new WordVO();
+
+            // 1. 基础字符串字段防空
+            vo.setWord(p.getWord() != null ? p.getWord() : "");
+            vo.setPhonetic(p.getPhonetic() != null ? p.getPhonetic() : "");
+            vo.setDefinition(p.getDefinition() != null ? p.getDefinition() : "");
+
+            // 2. 状态与难度字段防空
+            vo.setStatus(p.getStatus() != null ? p.getStatus() : "RAW");
+            vo.setDifficulty(p.getDifficulty() != null ? p.getDifficulty() : "INIT_STRANGER");
+            vo.setDisplayStrategy("EN_TO_CN"); // 默认值
+
+            // 3. 数值字段防空与自动拆箱保护
+            Integer reviewCount = p.getReviewCount();
+            vo.setReviewCount(reviewCount != null ? reviewCount : 0);
+
+            Integer totalCount = p.getTotalCount();
+            int total = (totalCount != null) ? totalCount : 0;
+            vo.setTotalCount(total);
+
+            Integer wrongCount = p.getWrongCount();
+            int wrong = (wrongCount != null) ? wrongCount : 0;
+            vo.setWrongCount(wrong);
+
+            Integer totalWrongCount = p.getTotalWrongCount();
+            vo.setTotalWrongCount(totalWrongCount != null ? totalWrongCount : 0);
+
+            Long lastReview = p.getLastReview();
+            vo.setLastReview(lastReview != null ? lastReview : 0L);
+
+            // 4. Double 类型字段防空
+            Double stability = p.getStability();
+            vo.setStability(stability != null ? stability : 2.0);
+
+            Double difficultyAa = p.getDifficultyAa();
+            vo.setDifficultyAa(difficultyAa != null ? difficultyAa : 50.0);
+
+            // 5. 计算衍生字段 (确保分母不为0)
             String errorRate = "0%";
             if (total > 0) {
                 double rate = (wrong * 100.0) / total;
                 errorRate = String.format("%.1f%%", rate);
             }
+            vo.setErrorRate(errorRate);
 
-            // 3. 完美对应 WordVO 的全参构造器 (其中 streak 默认注入 0，等待进入全屏滚动时被接管)
-            WordVO vo = new WordVO(p.getWord(), p.getPhonetic(), p.getDefinition(), p.getReviewCount(), p.getStatus(), p.getDifficulty(), p.getDifficultyAa(), p.getLastReview(), total, errorRate, 0, // streak 初始值
-                    wrong, p.getTotalWrongCount(), 1, 0, 0, 0, 0);
+            // 6. 初始化其他战术指标
+            vo.setStreak(0);
+            vo.setFamiliarDepth(0);
+            vo.setDynamicPriorityScore(0.0); // 建议后续补充真实计算逻辑
+            vo.setMasteryLevel(0);
+            vo.setReviewIntervalMinutes(0);
 
             voList.add(vo);
         }
         return voList;
-    }
-
-
-    /**
-     * 🧠 融合分层失效策略的——记忆状态预测引擎
-     */
-    /**
-     * 🧠 融合“5-10-30绝对步长回马枪”的记忆状态预测引擎
-     *
-     * @param allBurningVOs 从数据库大盘捞出来的、当前处于燃烧区的所有高危候选词汇
-     */
-    public List<WordVO> memoryStatePredictionEngine(List<WordVO> allBurningVOs, String bookId) {
-        if (allBurningVOs == null || allBurningVOs.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        long now = System.currentTimeMillis();
-        Map<String, WordVO> pool = WordBombSnapshotController.syncCachePool;
-        List<WordVO> retaliationList = new ArrayList<>();
-
-        // =========================================================================
-        // 🔄 步骤一：提取缓存池中的回马枪种子，执行长期模型反哺，并收拢到内存插队列表
-        // =========================================================================
-        if (!pool.isEmpty()) {
-            Iterator<Map.Entry<String, WordVO>> iterator = pool.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, WordVO> entry = iterator.next();
-                String key = entry.getKey();
-                WordVO cachedVO = entry.getValue();
-
-                if (key.startsWith(bookId + ":")) {
-                    // 1. 捞取底层长期持久化模型
-                    WordRelation relation = wordRelationRepository.findByBookIdAndWord(bookId, cachedVO.getWord()).orElseGet(() -> {
-                        WordRelation newRel = new WordRelation();
-                        newRel.setBookId(bookId);
-                        newRel.setWord(cachedVO.getWord());
-                        newRel.setStability(2.0);
-                        newRel.setDifficultyAa(50.0);
-                        newRel.setStatus("BURNING");
-                        return newRel;
-                    });
-
-                    // 2. 反哺长期脑科学指标（保证数据面平滑演进）
-                    relation.setReviewCount(relation.getReviewCount() + 1);
-                    relation.setLastReview(now);
-
-                    String status = cachedVO.getDifficulty() != null ? cachedVO.getDifficulty().toUpperCase() : "FAMILIAR";
-                    switch (status) {
-                        case "STRANGER": // 陌生
-                            relation.setWrongCount(relation.getWrongCount() + 1);
-                            relation.setStability(Math.max(0.5, relation.getStability() * 0.35)); // 稳定度崩塌
-                            relation.setDifficultyAa(Math.min(100.0, relation.getDifficultyAa() + 12.0));
-                            break;
-                        case "VAGUE": // 模糊
-                            relation.setStability(Math.max(1.0, relation.getStability() * 0.8)); // 踩刹车
-                            relation.setDifficultyAa(Math.min(100.0, relation.getDifficultyAa() + 2.0));
-                            break;
-                        case "EASY": // 熟悉
-                            relation.setWrongCount(0);
-                            double growth = 2.5 - (relation.getDifficultyAa() / 100.0);
-                            relation.setStability(relation.getStability() * Math.max(1.4, growth)); // 膨胀
-                            break;
-                    }
-                    wordRelationRepository.save(relation);
-
-                    // 3. 收集需要进行物理回马枪插队的种子
-                    if (cachedVO.getTriggerTargetIndex() > 0) {
-                        retaliationList.add(cachedVO);
-                    }
-
-                    // 清洗内存，防止二次合并
-                    iterator.remove();
-                }
-            }
-        }
-
-        // =========================================================================
-        // 🔮 步骤二：计算大盘正常候选词的艾宾浩斯遗忘概率，并生成基础序列
-        // =========================================================================
-        List<WordVO> baseSequence = new ArrayList<>();
-        for (WordVO vo : allBurningVOs) {
-            // 计算流逝时间并使用公式 P_forget = 1 - e^(-t/S)
-            double stability = vo.getStability() > 0 ? vo.getStability() : 2.0;
-            long lastReviewTime = vo.getLastReview() != null ? vo.getLastReview() : 0L;
-            double daysPassed = (lastReviewTime == 0L) ? 1.5 : (double) (now - lastReviewTime) / (1000 * 60 * 60 * 24);
-
-            double forgetProbability = 1.0 - Math.exp(-daysPassed / stability);
-            int wrongStreak = vo.getWrongCount() != null ? vo.getWrongCount() : 0;
-
-            // 核心调度排序分
-            double score = (forgetProbability * 100.0) + (vo.getDifficultyAa() * 0.5) + (wrongStreak * 10.0);
-            vo.setDynamicPriorityScore(score);
-            baseSequence.add(vo);
-        }
-
-        // 基础队列按遗忘高危度降维排序
-        baseSequence.sort((v1, v2) -> Double.compare(v2.getDynamicPriorityScore(), v1.getDynamicPriorityScore()));
-
-        // =========================================================================
-        // ⚔️ 步骤三：【终极融合】将基础队列截取至大弹夹，并用回马枪种子强行物理插队
-        // =========================================================================
-        int finalCapacity = 40; // 适当放宽大弹夹长度，以便容纳 +30 位置的回马枪熟词
-        List<WordVO> finalMagazine = new ArrayList<>();
-
-        int baseIdx = 0;
-        for (int i = 0; i < finalCapacity; i++) {
-            // 检查当前物理位置 (i) 是否命中了某个回马枪种子的绝对阵位
-            WordVO matchedRetaliationWord = null;
-            for (WordVO rWord : retaliationList) {
-                if (rWord.getTriggerTargetIndex() == i) {
-                    matchedRetaliationWord = rWord;
-                    break;
-                }
-            }
-
-            if (matchedRetaliationWord != null) {
-                // 💥 拦截！回马枪强制插队浮现！
-                // 重置插队标记防止无限连环插队，重新随机分配盲盒展示策略
-                matchedRetaliationWord.setTriggerTargetIndex(-1);
-                boolean isChineseFirst = java.util.concurrent.ThreadLocalRandom.current().nextBoolean();
-                matchedRetaliationWord.setDisplayStrategy(isChineseFirst ? "ZH_FIRST" : "EN_FIRST");
-
-                finalMagazine.add(matchedRetaliationWord);
-                retaliationList.remove(matchedRetaliationWord); // 移出处理完的种子
-            } else {
-                // 正常填充基础遗忘高危词
-                if (baseIdx < baseSequence.size()) {
-                    WordVO normalVo = baseSequence.get(baseIdx++);
-                    boolean isChineseFirst = java.util.concurrent.ThreadLocalRandom.current().nextBoolean();
-                    normalVo.setDisplayStrategy(isChineseFirst ? "ZH_FIRST" : "EN_FIRST");
-                    finalMagazine.add(normalVo);
-                }
-            }
-        }
-
-        // 截取前 30 个词作为滚动冲锋弹夹返回给前端 UI 渲染
-        int windowSize = Math.min(finalMagazine.size(), 30);
-        return new ArrayList<>(finalMagazine.subList(0, windowSize));
     }
 
 }

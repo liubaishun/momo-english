@@ -3,13 +3,13 @@ package com.momo.controller;
 import com.momo.dto.BombSnapshotDTO;
 import com.momo.dto.WordVO;
 import com.momo.service.WordBombSnapshotService;
+import com.momo.service.strategy.RollingRefuelEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/words")
@@ -17,11 +17,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WordBombSnapshotController {
 
     @Autowired
+    private RollingRefuelEngine refuelEngine;
+    @Autowired
     private WordBombSnapshotService wordBombSnapshotService;
 
     /**
      * ⚡ 场景一：拉取黑匣子:
-     *   当在
+     * 当在
      * GET http://localhost:8080/api/words/snapshot/load?bookId=xxx
      */
     @GetMapping("/snapshot/load")
@@ -40,11 +42,6 @@ public class WordBombSnapshotController {
         }
     }
 
-
-    // 🏎️ 核心：高并发内存蓄水池，替代直接的数据库 I/O
-    public static final Map<String, WordVO> syncCachePool = new ConcurrentHashMap<>();
-
-
     /**
      * 📥 1. 前端滚动更新状态：不查不写数据库，极速进缓存，并注入分层时效
      */
@@ -54,29 +51,16 @@ public class WordBombSnapshotController {
             return ResponseEntity.badRequest().body("❌ 战术载荷缺失");
         }
 
+        // 1. 驱动轴前进：用户只要点一次反馈，后端的绝对时空轴就立刻原子自增 +1
+        // 这一步确保了 userGlobalTick 能够精准实时记录用户在宇宙长河中走了多远
+        refuelEngine.handleUserClickFeedback(bookId, "1", incomingVO);
+
+        // 2. 纯粹的极速物理收容（折叠 I/O，不在这里做复杂的步长计算）
+        // 所有的计算全部交给后续的预测引擎在批量消费时统一对齐
         String cacheKey = bookId + ":" + incomingVO.getWord();
-        String status = incomingVO.getDifficulty();
+        refuelEngine.getUserCacheSnapshot("1").put(cacheKey, incomingVO);
 
-        if (status != null) {
-            switch (status.toUpperCase()) {
-                case "STRANGER": // 🌋 陌生：5词后必杀回马枪
-                    incomingVO.setTriggerTargetIndex(5);
-                    break;
-                case "VAGUE":    // 🟡 模糊：10词后回马枪
-                    incomingVO.setTriggerTargetIndex(10);
-                    break;
-                case "FAMILIAR": // 🟢 熟悉：30词后回马枪（留空位供后续非常熟悉演化）
-                    incomingVO.setTriggerTargetIndex(30);
-                    break;
-                default:
-                    incomingVO.setTriggerTargetIndex(-1); // 无需强化
-                    break;
-            }
-        }
-
-        // 极速注入前线内存池，折叠I/O
-        syncCachePool.put(cacheKey, incomingVO);
-        return ResponseEntity.ok("⚡ 物理回马枪步长锁定，已注入内存池");
+        return ResponseEntity.ok("⚡ 状态快照已极速收容，时空轴单向推进成功");
     }
 
     /**

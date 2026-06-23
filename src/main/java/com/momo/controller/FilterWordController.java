@@ -65,7 +65,7 @@ public class FilterWordController {
         String source = (String) payload.get("source");
 
         // 调用 Service 处理
-        filterService.processWordReview(bookId, word, masteryDegree, source);
+        filterService.processWordReview(1L, bookId, word, masteryDegree, source);
 
         Map<String, String> result = new HashMap<>();
         result.put("status", "success");
@@ -95,7 +95,7 @@ public class FilterWordController {
         }
 
         // 交付 Service 层，并将 source 战术下发
-        filterService.restoreWords(bookId, words, source);
+        filterService.restoreWords(0L,bookId, words, source);
 
         result.put("status", "success");
         result.put("message", "成功处理 " + words.size() + " 个单词的还原请求");

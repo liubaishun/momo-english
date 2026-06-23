@@ -3,12 +3,8 @@ package com.momo.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.momo.dto.KillRequest;
-import com.momo.dto.WordKillProjection;
-import com.momo.dto.WordVO;
 import com.momo.model.Difficulty;
 import com.momo.model.Word;
-import com.momo.model.WordDetailDTO;
 import com.momo.model.WordRelation;
 import com.momo.repository.WordRelationRepository;
 import com.momo.repository.WordRepository;
@@ -27,7 +23,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -187,16 +182,13 @@ public class WordService {
     }
 
 
-
-
-
-    public WordRelation getRecord(String bookId, String word) {
+    public WordRelation getRecord(Long userId,String bookId, String word) {
         if (bookId == null || word == null) {
             return null;
         }
 
         // 查询数据库
-        Optional<WordRelation> recordOpt = wordRelationRepository.findByBookIdAndWord(bookId, word);
+        Optional<WordRelation> recordOpt = wordRelationRepository.findByUserIdAndBookIdAndWord(userId,bookId, word);
 
         // 如果存在则返回，否则返回 null（或者你可以选择在这里创建一个新的 WordRelation 对象）
         return recordOpt.orElse(null);
@@ -225,14 +217,14 @@ public class WordService {
      * @param words  需要打回的单词列表
      */
     @Transactional
-    public void restoreWords(String bookId, List<String> words, String source) {
+    public void restoreWords(Long usrId, String bookId, List<String> words, String source) {
         if (words == null || words.isEmpty()) {
             return; // 战术空检，防止空指针
         }
         long currentTime = System.currentTimeMillis();
         // ⚡ 地毯式循环遍历处理每一个要回炉的单词
         for (String word : words) {
-            Optional<WordRelation> relationOpt = wordRelationRepository.findByBookIdAndWord(bookId, word);
+            Optional<WordRelation> relationOpt = wordRelationRepository.findByUserIdAndBookIdAndWord(usrId, bookId, word);
             if (relationOpt.isPresent()) {
                 WordRelation record = relationOpt.get();
                 // 🧭 通道一：来自“过滤页面（filterPage）”的误触撤销

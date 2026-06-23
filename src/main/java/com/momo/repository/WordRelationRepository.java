@@ -13,6 +13,7 @@ import java.util.Optional;
 @Repository
 public interface WordRelationRepository extends JpaRepository<WordRelation, Long> {
 
+
     /**
      * 根据 bookId 和 status 查询单词详情
      *
@@ -41,8 +42,7 @@ public interface WordRelationRepository extends JpaRepository<WordRelation, Long
      * 根据书本名称和单词内容查询记忆记录
      * 注意：如果你的表结构中 book 是 ID (Long)，请将参数类型改为 Long，并调整字段名
      */
-    Optional<WordRelation> findByBookIdAndWord(String bookId, String word);
-
+    Optional<WordRelation> findByUserIdAndBookIdAndWord(Long userId, String bookId, String word);
 
     /**
      * 🎯 战术核心：斩杀页面专用（待背词表 / 已背词表）双大盘拉取
@@ -51,7 +51,6 @@ public interface WordRelationRepository extends JpaRepository<WordRelation, Long
      * 2. 当 status = 'FROZEN' (已背词表)：
      * 捞取所有已经顺利斩杀毕业、或秒杀进入冻结舱（status == 'FROZEN'）的熟词。
      */
-
     @Query(value = "SELECT d.word as word, " +
             "d.phonetic as phonetic, " +
             "d.definition as definition, " +
@@ -59,21 +58,23 @@ public interface WordRelationRepository extends JpaRepository<WordRelation, Long
             "COALESCE(r.wrong_count, 0) as wrongCount, " +
             "COALESCE(r.status, 'BURNING') as status, " +
             "r.difficulty as difficulty, " +
+            "r.user_id as userId, " +
             "r.stability as stability, " +
             "r.difficulty_aa as difficultyAa, " +
             "r.last_review as lastReview, " +
             "COALESCE(r.total_count, 0) as totalCount, " +
-            "COALESCE(r.total_wrong_count, 0) as totalWrongCount " + // 🎯 补齐第 10 列：终身审计错词数
+            "COALESCE(r.total_wrong_count, 0) as totalWrongCount " +
             "FROM word d " +
             "INNER JOIN word_relation r ON d.word = r.word AND d.book_id = r.book_id " +
             "WHERE d.book_id = :bookId " +
+            // 【新增】添加 userId 过滤条件
+            "AND r.user_id = :userId " +
             "AND ( " +
             "   (:status = 'BURNING' AND r.status = 'BURNING' AND (r.difficulty IS NULL OR r.difficulty != 'STUCK_LOOP')) " +
             "   OR " +
             "   (:status = 'FROZEN' AND r.status = 'FROZEN') " +
             ")", nativeQuery = true)
-    List<WordKillProjection> findKillPageWordsRaw(@Param("bookId") String bookId, @Param("status") String status);
-
+    List<WordKillProjection> findKillPageWordsRaw(@Param("userId") Long userId, @Param("bookId") String bookId, @Param("status") String status);
 
 
     @Query(value = "SELECT d.word as word, " +
@@ -91,7 +92,29 @@ public interface WordRelationRepository extends JpaRepository<WordRelation, Long
             "FROM word d " +
             "INNER JOIN word_relation r ON d.word = r.word AND d.book_id = r.book_id " +
             "WHERE d.book_id = :bookId " +                         // 🎯 纠正：book_id 匹配词书
-            "AND d.word = :word", nativeQuery = true)              // 🎯 纠正：word 匹配精准单词
+            "AND d.word = :word", nativeQuery = true)
+        // 🎯 纠正：word 匹配精准单词
     WordKillProjection findKillWord(@Param("bookId") String bookId, @Param("word") String word);
+
+
+    @Query(value = "SELECT d.word as word, " +
+            "d.phonetic as phonetic, " +
+            "d.definition as definition, " +
+            "COALESCE(r.review_count, 0) as reviewCount, " +
+            "r.user_id as userId, " +
+            "COALESCE(r.wrong_count, 0) as wrongCount, " +
+            "COALESCE(r.status, 'BURNING') as status, " +
+            "r.difficulty as difficulty, " +
+            "r.last_review as lastReview, " +
+            "COALESCE(r.total_count, 0) as totalCount, " +
+            "COALESCE(r.total_wrong_count, 0) as totalWrongCount, " +
+            "COALESCE(r.stability, 0.0) as stability, " +          // 🧠 投影：脑科学稳定性系数
+            "COALESCE(r.difficulty_aa, 0.0) as difficultyAa " +     // 🧠 投影：自适应难度系数
+            "FROM word d " +
+            "INNER JOIN word_relation r ON d.word = r.word AND d.book_id = r.book_id " +
+            "WHERE d.book_id = :bookId " +                         // 🎯 纠正：book_id 匹配词书
+            "AND d.word = :word AND r.user_id = :userId", nativeQuery = true)
+        // 🎯 纠正：word 匹配精准单词
+    WordKillProjection findKillWordByUserId(@Param("userId") Long userId, @Param("bookId") String bookId, @Param("word") String word);
 
 }

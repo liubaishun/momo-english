@@ -393,6 +393,402 @@
             background-size: 300% 100% !important;
             box-shadow: 0 0 15px rgba(255, 77, 79, 0.7), 0 0 6px rgba(245, 34, 45, 0.5) !important;
         }
+
+        /* =========================================================================
+   🤖 AI 词根联想记忆系统专属护城河样式
+   ========================================================================= */
+.bomb-ai-container {
+    width: 80%;
+    max-width: 800px;
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(30, 30, 32, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    display: none; /* 默认隐藏，有 AI 数据时才轰然展现 */
+    flex-direction: column;
+    gap: 18px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* 当激活显示时类名 */
+.bomb-ai-container.active {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ai-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ai-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 🧬 词根拆解流体布局 */
+.ai-root-box {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: #131314;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.root-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+}
+
+.root-item span {
+    font-family: 'Consolas', monospace;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #fff;
+}
+
+.root-item small {
+    color: var(--accent-color);
+    margin: 2px 0;
+    font-size: 0.9rem;
+}
+
+.root-item p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.root-plus {
+    font-size: 1.1rem;
+    color: #444746;
+    padding: 0 4px;
+    margin-top: -16px; /* 对齐加号位置 */
+}
+
+/* 🧠 记忆故事卡片 */
+.ai-story-card {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: #e3e3e3;
+    padding: 14px 18px;
+    background: rgba(168, 199, 250, 0.03);
+    border-left: 3px solid var(--accent-color);
+    border-radius: 0 10px 10px 0;
+}
+
+/* 🛡️ 家族词胶囊 */
+.ai-family-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.family-badge {
+    background: #282a2c;
+    border: 1px solid var(--border-color);
+    color: var(--accent-color);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-family: monospace;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.family-badge:hover {
+    background: rgba(168, 199, 250, 0.1);
+    border-color: var(--accent-color);
+    transform: scale(1.05);
+}
+
+
+        /* 🪐 绝对时空：右侧垂直居中悬浮手柄 */
+.ai-toggle-bar {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%); /* 倒回自身高度的一半，达成绝对垂直居中 */
+    z-index: 9999; /* 确保悬浮在所有大盘和弹窗组件的最顶层 */
+
+    display: flex;
+    flex-direction: column; /* 让图标和文字垂直排列，更适合侧边栏宽度 */
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(20, 20, 20, 0.85); /* 略带透明的暗黑科技感背景 */
+    backdrop-filter: blur(8px); /* 磨砂玻璃视效 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: none; /* 贴边贴死，靠右侧不需要边框 */
+
+    padding: 14px 10px;
+    border-radius: 8px 0 0 8px; /* 只有左边有圆角，形成扣在屏幕边缘的舱门感 */
+    width: 40px; /* 窄侧边栏限制宽度 */
+    cursor: pointer;
+    user-select: none;
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 鼠标悬停时的流光微调 */
+.ai-toggle-bar:hover {
+    background: rgba(168, 199, 250, 0.15);
+    border-color: rgba(168, 199, 250, 0.4);
+    border-right: none;
+    width: 45px; /* 鼠标摸上去稍微往左探出一点，增加动态物理反馈 */
+}
+
+.ai-radar-icon {
+    margin-bottom: 6px;
+    font-size: 1.2rem;
+}
+
+/* 侧边竖排文字微调 */
+.ai-toggle-text {
+    writing-mode: vertical-rl; /* ⚡ 核心战术：强行让文字从上往下竖着排 */
+    font-size: 0.8rem;
+    color: var(--text-muted, #8e918f);
+    letter-spacing: 2px;
+    margin: 8px 0;
+}
+
+/* 🪐 悬浮模式下的箭头旋转（从向左指，点击后向下指） */
+.ai-toggle-arrow {
+    font-size: 0.7rem;
+    color: var(--text-muted, #8e918f);
+    display: inline-block;
+    transform: rotate(180deg); /* 默认朝左（◀），指向屏幕内测 */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 点击激活后，小箭头丝滑旋转，指向下方 */
+.ai-toggle-arrow.open {
+    transform: rotate(90deg); /* 顺时针转到向下（▼） */
+    color: var(--accent-color, #a8c7fa);
+}
+
+        /* 默认情况下，AI 容器是隐藏或者高度为 0、透明度为 0 的 */
+.ai-container-box {
+    display: none; /* 或者 opacity: 0; max-height: 0; transition: all 0.3s ease; */
+}
+
+/* 当加上 active 类名时，瞬间或者平滑展现 */
+.ai-container-box.active {
+    display: block; /* 或者 opacity: 1; max-height: 500px; */
+}
+
+/* 箭头旋转动效 */
+.b-ai-arrow {
+    transition: transform 0.3s ease;
+}
+.b-ai-arrow.open {
+    transform: rotate(90deg); /* 或者是 180deg，看你原本设计的箭头方向 */
+}
+        /* 📡 AI 触发条手柄样式（确保鼠标手势） */
+.ai-toggle-bar {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 8px;
+}
+
+/* ◀ 战术箭头基础相变状态：增加旋转过渡 */
+.ai-toggle-arrow {
+    display: inline-block;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-left: auto; /* 强行推到最右侧 */
+}
+
+/* ◀ 箭头激活相变：顺时针旋转 90 度，指向下方 */
+.ai-toggle-arrow.open {
+    transform: rotate(-90deg); /* 如果基础是◀，逆时针转90度变成▼ */
+}
+
+/* 🪐 AI 核心内容容器：初始状态完全冷切收起 */
+.ai-container-box {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+
+    /* 核心视觉缓冲线：防止收起时内部边框残留 */
+    border: 0px solid transparent;
+}
+
+/* ⚡ 当加上 .active 时的满血相变状态 */
+.ai-container-box.active {
+    max-height: 800px; /* 给予一个足够大的安全高度撑开内容 */
+    opacity: 1;
+    padding-top: 12px;
+    padding-bottom: 12px;
+}
+        /* 🎨 让 AI 拆解的突触高亮更精致 */
+#bAiStory mark {
+    background: linear-gradient(to bottom, transparent 60%, rgba(255, 193, 7, 0.4) 40%); /* 优雅的下划线高亮 */
+    color: #ff9800; /* 甚至可以改字的颜色 */
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 4px;
+}
+/* =========================================================================
+   🎨 AI 词根触发条：自适应悬停展开引擎
+   ========================================================================= */
+.ai-toggle-bar {
+    display: inline-flex; /* 👈 改为 inline-flex，让宽度随内容自适应压缩 */
+    align-items: center;
+    background: #1e1e21;
+    border: 1px solid #333538;
+    padding: 6px; /* 初始状态紧贴圆形徽章 */
+    border-radius: 32px;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden; /* 隐藏未展开的文字 */
+
+    /* 宽度与内边距的过渡曲线，使其有弹簧般的灵动感 */
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================================================================
+   🚀 核心卡点：当鼠标悬停（Hover）时，大盘容器的视觉相变
+   ========================================================================= */
+.ai-toggle-bar:hover {
+    background: #262629;
+    border-color: #ff7875;
+    padding-left: 8px;
+    padding-right: 16px; /* 展开后右侧留出安全战术空间 */
+    box-shadow: 0 0 16px rgba(255, 120, 117, 0.2);
+}
+
+/* 🎯 圆形渐变粉红徽章 */
+.ai-badge-icon {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #d8607c 0%, #b3425b 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* 绝对防御：防止被挤压变形 */
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2);
+}
+
+/* 斜向高光扫面滤镜 */
+.ai-badge-icon::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -20%;
+    width: 140%;
+    height: 70%;
+    background: rgba(255, 255, 255, 0.25);
+    transform: rotate(-30deg);
+    pointer-events: none;
+}
+
+/* ✨ 闪烁四角星 */
+.ai-star {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: bold;
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+    animation: aiPulse 2s infinite ease-in-out;
+}
+
+/* 🔤 核心字母 A */
+.ai-letter {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.9);
+    transform: translate(1px, 1px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* =========================================================================
+   🛰️ 动态文字滑出控制（默认收起）
+   ========================================================================= */
+.ai-toggle-text {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #e3e2e6;
+    letter-spacing: 0.5px;
+    white-space: nowrap; /* 必须加：防止文字在展开过程中换行抖动 */
+
+    /* 核心空间封锁：初始状态宽为0，透明度为0 */
+    max-width: 0;
+    opacity: 0;
+    margin-left: 0;
+    transition: max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease,
+                margin-left 0.35s ease;
+}
+
+/* 🔥 悬停时：文字滑出亮灯 */
+.ai-toggle-bar:hover .ai-toggle-text {
+    max-width: 80px; /* 给予一个足够撑开字体的安全宽度 */
+    opacity: 1;
+    margin-left: 8px; /* 产生与左侧徽章隔开的推力 */
+}
+
+/* =========================================================================
+   🛰️ 动态小箭头控制（默认收起）
+   ========================================================================= */
+.ai-toggle-arrow {
+    color: #8e918f;
+    font-size: 0.8rem;
+
+    /* 核心空间封锁 */
+    max-width: 0;
+    opacity: 0;
+    margin-left: 0;
+    transition: max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.2s ease,
+                margin-left 0.35s ease,
+                transform 0.25s ease;
+}
+
+/* 🔥 悬停时：小箭头滑出亮灯 */
+.ai-toggle-bar:hover .ai-toggle-arrow {
+    max-width: 20px;
+    opacity: 1;
+    margin-left: 12px;
+}
+
+/* 当点击展开 AI 内容区后，箭头保持相变旋转（对齐老逻辑） */
+.ai-toggle-arrow.open {
+    transform: rotate(-90deg);
+    color: #ff7875;
+}
+
+/* 星星呼吸闪烁特效动画 */
+@keyframes aiPulse {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+    50% { transform: scale(1.2) rotate(15deg); opacity: 1; text-shadow: 0 0 8px #fff; }
+}
     </style>
 </head>
 <body>
@@ -427,7 +823,19 @@
                         <span style="margin-left: 20px; color: var(--text-muted); font-size: 0.95rem;">容纳战术核心词 <strong style="color: #fff; font-family: monospace; font-size:1.1rem;">{{ totalWordsCount }}</strong> 个</span>
                     </div>
                 </div>
-                <button class="btn btn-primary" id="startBombBtn">🚀 开始全屏滚动</button>
+                <div style="display: inline-flex; align-items: center; background: #262629; color: var(--text-main, #e3e2e6); border: 1px solid var(--border-color, #444746); border-radius: 24px; padding: 2px; overflow: hidden; height: 42px; transition: all 0.25s ease;">
+
+                    <button id="startBombBtn" style="background: transparent; border: none; color: var(--accent-color, #a8c7fa); height: 100%; padding: 0 16px 0 20px; font-weight: bold; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; border-radius: 22px 0 0 22px;" onmouseover="this.style.background='rgba(168,199,250,0.1)'" onmouseout="this.style.background='transparent'">
+                        🚀 开始全屏滚动
+                    </button>
+
+                    <div style="width: 1px; height: 18px; background: var(--border-color, #444746); user-select: none;"></div>
+
+                    <button @click="openConfigDialog" style="background: transparent; border: none; color: var(--text-muted, #8e918f); height: 100%; width: 44px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; cursor: pointer; transition: all 0.2s; border-radius: 0 22px 22px 0;" title="配置滚动流派" onmouseover="this.style.background='rgba(255,255,255,0.05)'; this.style.color='var(--accent-color)'" onmouseout="this.style.background='transparent'; this.style.color='var(--text-muted)'">
+                        ⚙️
+                    </button>
+
+                </div>
             </div>
         </div>
 
@@ -504,7 +912,7 @@
                 <span class="badge-category" id="bombCategory">单词滚动</span>
                 <span class="badge-count" id="bombRemainingCount">已击发：0 词</span>
                 <span class="badge-count" id="bombCurrentIndex" style="display:none;">0</span>
-                <span class="badge-mode" id="bombModeBadge">实时截击流</span>
+                <span id="bombModeBadge" class="mode-badge" style="font-size: 0.8rem; padding: 2px 8px; border-radius: 12px;">实时截击流</span>
             </div>
 
             <div class="bomb-header-right-zone">
@@ -526,13 +934,43 @@
         </div>
         <div class="bomb-trans" id="bTrans">翻译</div>
 
+        <div id="bAiToggleBar" class="ai-toggle-bar" onclick="manualTriggerAi()">
+            <div class="ai-badge-icon">
+                <span class="ai-star">✦</span>
+                <span class="ai-letter">A</span>
+            </div>
+            <span id="bAiArrow" class="ai-toggle-arrow">◀</span>
+        </div>
+
+        <div class="bomb-card">
+        <div id="bAiContainer" class="ai-container-box">
+            <div class="ai-section">
+                <div class="ai-title">🛰️ 核心词根链条拆解</div>
+                <div class="ai-root-box" id="bAiRoots">
+                </div>
+            </div>
+
+            <div class="ai-section">
+                <div class="ai-title">🧠 突触级 AI 联想记忆</div>
+                <div class="ai-story-card" id="bAiStory">
+                    加载中...
+                </div>
+            </div>
+
+            <div class="ai-section">
+                <div class="ai-title">🛡️ 同源衍生家族词</div>
+                <div class="ai-family-group" id="bAiFamily">
+                </div>
+            </div>
+        </div>
+        </div>
         <div class="bomb-controls">
             <button class="btn btn-secondary" onclick="bombPrev()">⏮️ 上一个<span class="btn-kbd">←</span></button>
             <button class="btn btn-secondary" onclick="toggleAudio()" id="audioToggleBtn">🔊 语音: 开</button>
             <button class="btn btn-secondary" onclick="toggleTrans()" id="transToggleBtn">👁️ 中文: 关<span class="btn-kbd">Q</span></button>
             <button class="btn btn-secondary" onclick="toggleAutoMode()" id="autoModeBtn">🌀 开启自动滚动<span class="btn-kbd">Space</span></button>
 
-            <div class="bomb-grading-group">
+            <div class="bomb-grading-group" id="bombGradingGroup" style="display: flex; gap: 10px;">
                 <button class="btn btn-grade btn-stranger" onclick="bombGrade(0)">
                     <span class="btn-icon">🌋</span>
                     <div class="btn-content"><span class="btn-text">陌生</span><span class="btn-kbd">1</span></div>
@@ -542,6 +980,10 @@
                     <div class="btn-content"><span class="btn-text">模糊</span><span class="btn-kbd">2</span></div>
                 </button>
                 <button class="btn btn-grade btn-mastered" onclick="bombGrade(2)">
+                    <span class="btn-icon">🔘</span>
+                    <div class="btn-content"><span class="btn-text">熟悉</span><span class="btn-kbd">3</span></div>
+                </button>
+                <button class="btn btn-grade btn-mastered" onclick="bombGrade(3)">
                     <span class="btn-icon">💎</span>
                     <div class="btn-content"><span class="btn-text">掌握</span><span class="btn-kbd">Enter</span></div>
                 </button>
@@ -583,6 +1025,42 @@
                     锁定参数并返回
                 </el-button>
             </span>
+        </template>
+    </el-dialog>
+
+    <el-dialog
+            v-model="configVisible"
+            title="🛰️ 轰炸机滚动模式战术分流器"
+            width="440px"
+            class="dark-dialog"
+            :append-to-body="true"
+            :z-index="100040"
+    >
+        <div class="setting-item">
+            <div class="setting-label"><span>选择全屏轰炸的流派架构</span></div>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s;" :style="scrollMode === 'DYNAMIC' ? 'border-color: var(--accent-color); background: rgba(168,199,250,0.05);' : ''">
+                    <input type="radio" v-model="scrollMode" value="DYNAMIC" style="margin-top: 4px; accent-color: var(--accent-color);">
+                    <div>
+                        <span style="font-weight: bold; color: var(--text-main); font-size: 0.95rem; display: block; margin-bottom: 4px;">📡 智能动态截击流 (推荐)</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">解锁 4 级打分阶梯。配合后端绝对时空轴算法，你越不会的单词贴脸频率越高，智能埋雷死磕。</span>
+                    </div>
+                </label>
+                <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s;" :style="scrollMode === 'STATIC_PAGE' ? 'border-color: #ffa940; background: rgba(255,169,64,0.05);' : ''">
+                    <input type="radio" v-model="scrollMode" value="STATIC_PAGE" style="margin-top: 4px; accent-color: #ffa940;">
+                    <div>
+                        <span style="font-weight: bold; color: #ffa940; font-size: 0.95rem; display: block; margin-bottom: 4px;">📋 当前页封闭扫描仪</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: block;">纯前端行为。仅对目前表格里展示的这页数据进行高频视觉轰炸，隐藏打分项，到头自动刹车提示。</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <template #footer>
+        <span class="dialog-footer">
+            <el-button type="primary" color="#a8c7fa" style="width:100%; font-weight:bold; height: 40px; color:#131314;" @click="configVisible = false">
+                锁定模式并返回大盘
+            </el-button>
+        </span>
         </template>
     </el-dialog>
 
@@ -631,6 +1109,8 @@
     // 🛰️ 绝对时间轴定海神针：全场唯一指针，只增不减
     let globalTick = 0;
 
+    let isAiExpandedForCurrentWord = false; // 当前单词是否已手动展开 AI
+
     let bombSaveTimer = null;
     let accumulatedLoad = 0;
     let lastWordTimestamp = Date.now();
@@ -641,6 +1121,7 @@
     const rawFrozenLength = ref(0);
 
     let audioSequenceToken = 0; // 全局发音令牌计数器
+    let aiSequenceToken = 0; // 🛰️ 全局 AI 战术时空令牌，防止老词异步回调穿透
 
     // =========================================================================
     // 🧠 Vue 战术节奏调校架构
@@ -650,6 +1131,11 @@
             const currentPage = ref(1);
             const pageSize = ref(20);
             const rawTotalCount = ref(0);
+
+            // 🪐 核心状态双子星：控制弹窗开关，以及当前的战术模式
+            const configVisible = ref(false);
+            // 🛰️ 新增滚动模式核心相变阀：'DYNAMIC'(智能截击流) 或 'STATIC_PAGE'(当前页扫描)
+            const scrollMode = ref('DYNAMIC');
 
             const settingVisible = ref(false);
             const englishBlurTime = ref(1500);
@@ -679,11 +1165,17 @@
             const closeSettingDialog = () => {
                 settingVisible.value = false;
             };
+            // ⚙️ 新增：大盘界面点击齿轮开启流派配置弹窗
+           const openConfigDialog = () => {
+               configVisible.value = true;
+           };
 
             return {
                 currentPage, pageSize, rawTotalCount, handleSizeChange, handleCurrentChange,
                 settingVisible, englishBlurTime, chineseShowTime, openSettingDialog, closeSettingDialog,
-                totalWordsCount, bombDuration
+                totalWordsCount, bombDuration,
+                // 🚀 确保将新变量和函数无情扔给模板
+                configVisible, scrollMode, openConfigDialog
             };
         }
     });
@@ -842,176 +1334,248 @@
      * @param {string} actionType - 'stranger'(陌生) / 'vague'(模糊) / 'mastered'(掌握) / 'familiar'(熟悉/自动滚动)
      */
     async function handleWordAction(word, actionType) {
-        clearAutoTimer();
-        try {
-            if (actionType === 'mastered') {
-                // 💎 【情况 A：掌握出队流】— 彻底剥离当前弹夹，不加时空 tick
-                const response = await fetch(`${API_BASE}/filter/kill`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ book: currentBookId, word: word, status: 'easy', source: 'bomb' })
-                });
-                if (!response.ok) throw new Error("分流同步失败");
-
-                bombList.splice(bombIndex, 1);
-                if (bombIndex >= bombList.length && bombList.length > 0) {
-                    bombIndex = bombList.length - 1;
-                }
-            } else {
-                // 📡 【情况 B：绝对阵位滚动流】— 记录埋雷，无情推进绝对时空
-                await fetch(`${API_BASE}/kill/kill`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        book: currentBookId,
-                        word: word,
-                        status: actionType,
-                        source: 'bomb',
-                        currentTick: globalTick // 📡 核心：传递当前绝对锚点给后端
-                    })
-                });
-
-                // 🪐 时空长河稳步前进
-                globalTick++;
-                bombIndex++;
-            }
-
+    clearAutoTimer();
+    try {
+        // 🛰️ 如果是静态页面模式，所有动作不跟后端数据库进行任何脏池同步
+        if (vm.scrollMode === 'STATIC_PAGE') {
+            bombIndex++;
             totalBrushedCount++;
 
-        } catch (err) {
-            console.error("💥 绝对时空总线交互异常:", err);
-        }
-
-        updateBombHeaderUI();
-
-        // 终局空盘拦截判定
-        if (bombList.length === 0) {
-            isAutoMode = false;
-            updateAutoBtnUI();
-            alert("🌟 当前批次轰炸训练圆满结束！");
-            exitBomb();
-            return;
-        }
-
-        // 驱动状态机自推进
-        if (isAutoMode) {
-            await executeAutoStep();
-        } else {
-            // 🚨 铁血防御：如果前台局部指针越界（说明走满了5步或弹夹空了），强行向后端要精准阵位
+            // 🎬 静态页终局拦截点：如果超过了当前页数组最大长度
             if (bombIndex >= bombList.length) {
-                await fetchMoreWordsDynamic();
+                isAutoMode = false;
+                updateAutoBtnUI();
+                alert(`📋 【当前页扫描完成】本页共 ${bombList.length} 个单词已轰炸清洗完毕！`);
+                exitBomb();
+                return;
+            }
+
+            updateBombHeaderUI();
+            if (isAutoMode) {
+                await executeAutoStep();
             } else {
                 showBombWord();
                 if (isAudioEnabled) playCurrentWordAudio();
             }
+            return; // 斩断后续的动态后端请求链路
         }
+
+        // =========================================================================
+        // 下面是你原本的智能动态模式（模式 A）后端上报逻辑，保持原样：
+        // =========================================================================
+        if (actionType === 'mastered') {
+            const response = await fetch(`${API_BASE}/filter/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book: currentBookId, word: word, status: 'easy', source: 'bomb' })
+            });
+            if (!response.ok) throw new Error("分流同步失败");
+            bombList.splice(bombIndex, 1);
+            if (bombIndex >= bombList.length && bombList.length > 0) {
+                bombIndex = bombList.length - 1;
+            }
+        } else if (actionType === 'familiar') {
+             bombIndex++;
+             globalTick++;
+         } else {
+            await fetch(`${API_BASE}/kill/kill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book: currentBookId, word: word, status: actionType, source: 'bomb', currentTick: globalTick })
+            });
+            globalTick++;
+            bombIndex++;
+        }
+        totalBrushedCount++;
+    } catch (err) {
+        console.error("💥 绝对时空总线交互异常:", err);
     }
 
-    // =========================================================================
-    // 🔒 统一原子级打分调度总线（手动按键流完全无缝熔接）
-    // =========================================================================
-    async function bombGrade(level) {
-        if (bombList.length === 0 || bombIndex >= bombList.length) return;
-        clearAutoTimer();
+    updateBombHeaderUI();
 
-        const currentWordObj = bombList[bombIndex];
-        const wordEl = document.getElementById('bWord');
-        const colors = ['#ff4d4f', '#ffa940', '#42b983'];
+    if (bombList.length === 0) {
+        isAutoMode = false;
+        updateAutoBtnUI();
+        alert("🌟 当前批次轰炸训练圆满结束！");
+        exitBomb();
+        return;
+    }
 
-        if (wordEl) {
-            wordEl.style.transition = 'none';
-            wordEl.style.color = colors[level];
-            setTimeout(() => { if (wordEl) { wordEl.style.transition = 'all 0.3s'; wordEl.style.color = ''; } }, 150);
-        }
-
-        switch(level) {
-            case 0: // 🌋 陌生
-                await handleWordAction(currentWordObj.word, 'stranger');
-                break;
-            case 1: // ⚡ 模糊
-                await handleWordAction(currentWordObj.word, 'vague');
-                break;
-            case 2: // 💎 掌握
-                await handleWordAction(currentWordObj.word, 'mastered');
-                break;
+    if (isAutoMode) {
+        await executeAutoStep();
+    } else {
+        if (bombIndex >= bombList.length) {
+            await fetchMoreWordsDynamic();
+        } else {
+            showBombWord();
+            if (isAudioEnabled) playCurrentWordAudio();
         }
     }
+}
+
+// =========================================================================
+// 🔒 统一原子级打分调度总线（手动按键与键盘流完美对齐版）
+// =========================================================================
+async function bombGrade(level) {
+    resetAiPanel(); // 👈 在这里调用，确保打分后面板自动收起
+    if (bombList.length === 0 || bombIndex >= bombList.length) return;
+    clearAutoTimer();
+
+
+    const currentWordObj = bombList[bombIndex];
+    const wordEl = document.getElementById('bWord');
+    const colors = ['#ff4d4f', '#ffa940', '#7cc0ff', '#42b983']; // 🎨 引入 4 级渐变流光反馈色
+
+    if (wordEl) {
+        wordEl.style.transition = 'none';
+        wordEl.style.color = colors[level];
+        setTimeout(() => { if (wordEl) { wordEl.style.transition = 'all 0.3s'; wordEl.style.color = ''; } }, 150);
+    }
+
+    switch(level) {
+        case 0: // 🌋 陌生 (触发 5 步贴脸回马枪)
+            await handleWordAction(currentWordObj.word, 'stranger');
+            break;
+        case 1: // ⚡ 模糊 (触发 10 步战略后移)
+            await handleWordAction(currentWordObj.word, 'vague');
+            break;
+        case 2: // 🔘 熟悉 (纯内存滑行推进，平滑流入基础滚动大盘)
+            await handleWordAction(currentWordObj.word, 'familiar');
+            break;
+        case 3: // 💎 掌握 (彻底出队分流，剥离弹夹落库)
+            await handleWordAction(currentWordObj.word, 'mastered');
+            break;
+    }
+}
+
+function handleGlobalKeydown(e) {
+    if (vm.settingVisible) return;
+    if (document.getElementById('bombOverlay').style.display !== 'flex') return;
+
+    // ⚡ 核心快捷键：空格、1、2、3、Enter 绝对防御映射
+    if (e.code === 'Space') { e.preventDefault(); toggleAutoMode(); return; }
+    if (e.key === '1') { e.preventDefault(); bombGrade(0); return; }
+    if (e.key === '2') { e.preventDefault(); bombGrade(1); return; }
+    if (e.key === '3') { e.preventDefault(); bombGrade(2); return; }
+    if (e.key === 'Enter') { e.preventDefault(); bombGrade(3); return; }
+
+    switch (e.code) {
+        case 'KeyQ': e.preventDefault(); toggleTrans(); break;
+        case 'ArrowLeft': e.preventDefault(); if (!isAutoMode) bombPrev(); break;
+        case 'ArrowRight': e.preventDefault(); if (!isAutoMode) bombNext(); break;
+        case 'Escape': e.preventDefault(); exitBomb(); break;
+    }
+}
 
     // =========================================================================
     // 🌀 自适应单轨独立相变状态机（自动滚动流）
     // =========================================================================
     async function executeAutoStep() {
+    if (!isAutoMode) return;
+    clearAutoTimer();
+
+    // 🚨 在每一轮自动滚动开始前，强制收起 AI 面板
+    resetAiPanel();
+
+    // 🚨 铁血防御线：5发子弹打光了，去后端拉下一组 5 个词
+    if (bombIndex >= bombList.length) {
+        // 🚀 高能熔断点：使用 await 拉取。拉取内部如果重启了 executeAutoStep，
+        // 那么这里必须立刻 return，斩断老流残留的生命周期，不让它往下走！
+        await fetchMoreWordsDynamic();
+        return;
+    }
+
+    const current = bombList[bombIndex];
+    if (!current) return; // 安全防御
+
+    syncMainListHighlight(current.word);
+
+    const transEl = document.getElementById('bTrans');
+    const wordEl = document.getElementById('bWord');
+    const phoneticEl = document.getElementById('bPhonetic');
+    const strategy = current.displayStrategy || "EN_FIRST";
+
+    // 🎯 只有真正合法的单流走到这里，才允许上报快照
+    saveBombToBackend(current);
+    updateBombHeaderUI();
+
+    // 🎭 第一阶段展现
+    if (strategy === "ZH_FIRST") {
+        currentPhase = 'chinese';
+        wordEl.style.visibility = 'hidden';
+        phoneticEl.style.visibility = 'hidden';
+        transEl.innerHTML = formatDefinition(current.definition);
+        transEl.classList.add('show');
+        fetchAndRenderAiAnalysis(current.word);
+    } else {
+        currentPhase = 'english';
+        wordEl.innerText = current.word;
+        wordEl.style.visibility = 'visible';
+        phoneticEl.style.visibility = 'visible';
+
+        let displayPhonetic = current.phonetic ? current.phonetic.trim() : '点击发音校准';
+        phoneticEl.innerHTML = `[${displayPhonetic}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
+        transEl.classList.remove('show');
+        transEl.innerText = "";
+
+        if (isAudioEnabled) { await playWordAudio(current.word); }
+    }
+
+    if (!isAutoMode) return;
+
+    autoLoopTimer = setTimeout(() => {
         if (!isAutoMode) return;
-        clearAutoTimer();
 
-        // 🚨 铁血防御线：如果指针走满 5 步，触发拉取
-        if (bombIndex >= bombList.length) {
-            await fetchMoreWordsDynamic();
-            if (!isAutoMode) return;
-        }
-
-        const current = bombList[bombIndex];
-        syncMainListHighlight(current.word);
-
-        const transEl = document.getElementById('bTrans');
-        const wordEl = document.getElementById('bWord');
-        const phoneticEl = document.getElementById('bPhonetic');
-        const strategy = current.displayStrategy || "EN_FIRST";
-
-        saveBombToBackend(current);
-        updateBombHeaderUI();
-
-        // 🎭 第一阶段展现
+        // 🎭 第二阶段展现
         if (strategy === "ZH_FIRST") {
-            currentPhase = 'chinese';
-            wordEl.style.visibility = 'hidden';
-            phoneticEl.style.visibility = 'hidden';
-            transEl.innerHTML = formatDefinition(current.definition);
-            transEl.classList.add('show');
-        } else {
             currentPhase = 'english';
             wordEl.innerText = current.word;
             wordEl.style.visibility = 'visible';
             phoneticEl.style.visibility = 'visible';
-
             let displayPhonetic = current.phonetic ? current.phonetic.trim() : '点击发音校准';
             phoneticEl.innerHTML = `[${displayPhonetic}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
-            transEl.classList.remove('show');
-            transEl.innerText = "";
-
-            if (isAudioEnabled) { await playWordAudio(current.word); }
+            if (isAudioEnabled) { playWordAudio(current.word); }
+        } else {
+            currentPhase = 'chinese';
+            transEl.innerHTML = formatDefinition(current.definition);
+            transEl.classList.add('show');
+            fetchAndRenderAiAnalysis(current.word);
         }
 
-        if (!isAutoMode) return;
-
-        autoLoopTimer = setTimeout(() => {
+        autoLoopTimer = setTimeout(async () => {
             if (!isAutoMode) return;
 
-            // 🎭 第二阶段展现
-            if (strategy === "ZH_FIRST") {
-                currentPhase = 'english';
-                wordEl.innerText = current.word;
-                wordEl.style.visibility = 'visible';
-                phoneticEl.style.visibility = 'visible';
-                let displayPhonetic = current.phonetic ? current.phonetic.trim() : '点击发音校准';
-                phoneticEl.innerHTML = `[${displayPhonetic}] <span id="speakBtn" style="cursor:pointer; margin-left:10px; font-size:0.8em;" onclick="speakCurrentWord()">🔊</span>`;
-                if (isAudioEnabled) { playWordAudio(current.word); }
-            } else {
-                currentPhase = 'chinese';
-                transEl.innerHTML = formatDefinition(current.definition);
-                transEl.classList.add('show');
+            // =========================================================================
+            // 🚨 【核心熔断拦截】：当前页静态扫描模式的自动切词
+            // =========================================================================
+            if (vm.scrollMode === 'STATIC_PAGE') {
+                bombIndex++;
+                totalBrushedCount++;
+
+                // 检查是否看完了当前页最后一张卡片
+                if (bombIndex >= bombList.length) {
+                    isAutoMode = false;
+                    updateAutoBtnUI();
+                    alert(`📋 【当前页扫描完成】本页 ${bombList.length} 个单词已全部全自动冲刷完毕！`);
+                    exitBomb();
+                    return; // 斩断一切，优雅离场
+                }
+
+                // 没到头，继续高频驱动状态机往前跑
+                updateBombHeaderUI();
+                await executeAutoStep();
+                return; // 核心拦截点：绝对不让它往下走，不触发旧模式的 handleWordAction
             }
 
-            autoLoopTimer = setTimeout(async () => {
-                if (!isAutoMode) return;
+            // =========================================================================
+            // 📡 智能动态截击流的旧逻辑（原样保留，它会去调用大盘总线 handleWordAction）
+            // =========================================================================
+            await handleWordAction(current.word, 'familiar');
 
-                // 🚀 【核心熔接点】：执行自动切词，走绝对时空大盘总线
-                await handleWordAction(current.word, 'familiar');
+        }, vm.chineseShowTime);
 
-            }, vm.chineseShowTime);
-
-        }, vm.englishBlurTime);
-    }
+    }, vm.englishBlurTime);
+}
 
 // =========================================================================
 // 🛰️ 时空编排器：弹夹无限重组拉取流（支持少单词自动新一轮滚动）
@@ -1025,6 +1589,10 @@ async function fetchMoreWordsDynamic() {
         const response = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING&globalTick=${globalTick}&size=5`);
         const newWords = await response.json();
 
+        // 🚨【核心高能熔接点】：不管拉没拉到新词，立刻强行斩断老定时器和老语音流
+        clearAutoTimer();
+        window.speechSynthesis.cancel();
+
         if (newWords && newWords.length > 0) {
             // 正常承接新弹夹
             bombList = newWords;
@@ -1037,21 +1605,21 @@ async function fetchMoreWordsDynamic() {
                 if (isAudioEnabled) playCurrentWordAudio();
             }
         } else {
-            // 🚨 【核心高能改动点】：当大盘洗空，或者单词过少导致后端无法吐出新词时
+            // 🚨 当大盘洗空，或者单词过少导致后端无法吐出新词时触发重置
             console.warn("🔄 触发新一轮滚动：大盘词弹已消耗完毕，正在强行重置时空轴...");
 
-            // 🎯 瞬间将全场的绝对时空长河归零！重新开始排阵
             globalTick = 0;
             bombIndex = 0;
 
-            // 📡 触发后端重置/重新激活该词书的燃烧状态（通知后端拉开新一轮死磕大幕）
-            // 注意：这里调用一个重置轮次的同步接口，让所有未彻底分流的词重新进入物理大盘
             const resetResponse = await fetch(`${API_BASE}/bomb/reset?bookId=${currentBookId}`, { method: 'POST' });
 
             if (resetResponse.ok) {
-                // 重置成功后，立刻重新抓取新一轮的第一批词弹
                 const retryResponse = await fetch(`${API_BASE}/bomb/load?bookId=${currentBookId}&status=BURNING&globalTick=${globalTick}&size=5`);
                 const retryWords = await retryResponse.json();
+
+                // 🚨 再次保险熔断老流
+                clearAutoTimer();
+                window.speechSynthesis.cancel();
 
                 if (retryWords && retryWords.length > 0) {
                     bombList = retryWords;
@@ -1064,7 +1632,6 @@ async function fetchMoreWordsDynamic() {
                         if (isAudioEnabled) playCurrentWordAudio();
                     }
                 } else {
-                    // 如果真的一个待刷单词都没有了（全盘彻底全绿掌握了）
                     alert("🎉 奇迹诞生！当前词书所有单词已彻底全量【掌握】分流，无词可刷！");
                     exitBomb();
                 }
@@ -1079,57 +1646,73 @@ async function fetchMoreWordsDynamic() {
     }
 }
 
-    // =========================================================================
-    // 🧠 极速自适应认知负载同步控制总线（提前触发轰炸重组的强行抓取器）
-    // =========================================================================
-    async function saveBombToBackend(currentWordObject) {
-        if (!currentBookId || !currentWordObject) return;
-        const now = Date.now();
-        const duration = (now - lastWordTimestamp) / 1000;
-        lastWordTimestamp = now;
+// =========================================================================
+// 🔘 满血双向相变手柄：彻底打通收起/展开
+// =========================================================================
+function manualTriggerAi() {
+    if (isAiExpandedForCurrentWord) {
+        // 如果当前是展开的，就关闭
+        resetAiPanel();
+    } else {
+        // 如果当前是关闭的，就展开
+        isAiExpandedForCurrentWord = true;
+        const arrow = document.getElementById('bAiArrow');
+        const aiContainer = document.getElementById('bAiContainer');
+        if (arrow) arrow.classList.add('open');
+        if (aiContainer) aiContainer.classList.add('active');
 
-        let wordWeight = 1.0;
-        if (currentWordObject.difficulty) {
-            switch (currentWordObject.difficulty) {
-                case 'STUCK_LOOP':     wordWeight += 3.5; break;
-                case 'REVIVE_FALL':
-                case 'KILL_RECOUP':    wordWeight += 2.5; break;
-                case 'INIT_STRANGER':  wordWeight += 2.0; break;
-                case 'INIT_VAGUE':     wordWeight += 1.0; break;
-                case 'SMOOTH_KILL':    wordWeight -= 0.5; break;
-            }
+        // 记得渲染数据
+        const current = bombList[bombIndex];
+        if (current) {
+            fetchAndRenderAiAnalysis(current.word);
         }
-        accumulatedLoad += duration * wordWeight;
-
-        // 异步快照备份
-        try {
-            fetch(`${API_BASE}/snapshot/save?bookId=${encodeURIComponent(currentBookId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word: currentWordObject.word, streak: currentWordObject.streak || 0 })
-            });
-        } catch(e) {}
-
-        // 🚨 错峰防灾高能控制点：负载堆积到达阈值（突发认知过载或安全策略触发提前刷新）
-        const strikeThreshold = (currentWordObject.difficulty === 'STUCK_LOOP') ? 10 : 15;
-        if (accumulatedLoad >= strikeThreshold) {
-            console.warn("⚠️ 判定当前处于极端认知过载！强行提前呼叫轰炸接口重配时空阵位。");
-            accumulatedLoad = 0;
-            if (bombSaveTimer) clearTimeout(bombSaveTimer);
-
-            // 🚀 全面剔除老concat方法，遇到紧急情况提前呼叫破坏性刷新，带着当前的 globalTick 让后端动态排雷！
-            await fetchMoreWordsDynamic();
-            return;
-        }
-
-        if (bombSaveTimer) clearTimeout(bombSaveTimer);
-        bombSaveTimer = setTimeout(() => { accumulatedLoad = 0; }, 4000);
     }
+}
+// =========================================================================
+// 🧠 极速自适应认知负载同步控制总线（已注入模式防穿透锁）
+// =========================================================================
+async function saveBombToBackend(currentWordObject) {
+    // 🚨 【核心拦截】：如果是静态扫描模式，直接熔断，不计算负载，更不发送快照 IO
+    if (vm.scrollMode === 'STATIC_PAGE') return;
+
+    if (!currentBookId || !currentWordObject) return;
+    const now = Date.now();
+    const duration = (now - lastWordTimestamp) / 1000;
+    lastWordTimestamp = now;
+
+    let wordWeight = 1.0;
+    if (currentWordObject.difficulty) {
+        switch (currentWordObject.difficulty) {
+            case 'STUCK_LOOP':     wordWeight += 3.5; break;
+            case 'REVIVE_FALL':
+            case 'KILL_RECOUP':    wordWeight += 2.5; break;
+            case 'INIT_STRANGER':  wordWeight += 2.0; break;
+            case 'INIT_VAGUE':     wordWeight += 1.0; break;
+            case 'SMOOTH_KILL':    wordWeight -= 0.5; break;
+        }
+    }
+    accumulatedLoad += duration * wordWeight;
+
+    // 异步快照备份
+    try {
+        fetch(`${API_BASE}/snapshot/save?bookId=${encodeURIComponent(currentBookId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ word: currentWordObject.word, streak: currentWordObject.streak || 0 })
+        });
+    } catch(e) {}
+
+    if (bombSaveTimer) clearTimeout(bombSaveTimer);
+    bombSaveTimer = setTimeout(() => { accumulatedLoad = 0; }, 4000);
+}
 
     // =========================================================================
     // 🛠️ 辅助视效与控制手柄流
     // =========================================================================
     function toggleAutoMode() {
+
+    // 关键点：每次加载新词时，AI 面板应默认为关闭状态
+    resetAiPanel();
         if (vm.settingVisible) return;
         isAutoMode = !isAutoMode;
 
@@ -1198,8 +1781,54 @@ async function fetchMoreWordsDynamic() {
     });
 }
 
+// =========================================================================
+// 🚀 满血斩杀流：轰炸机战略启动总线（双流派绝对物理隔离版）
+// =========================================================================
+
     async function startWordBomb() {
         if (!currentBookId) return alert("请先选择单词书！");
+
+        totalBrushedCount = 0;
+
+    // =========================================================================
+// 🔥 【分支 B：当前页静态扫描模式】
+// =========================================================================
+if (vm.scrollMode === 'STATIC_PAGE') {
+    if (!activeDisplayList || activeDisplayList.length === 0) {
+        return alert("📋 当前大盘页面没有有效单词，无法进行封闭扫描！");
+    }
+
+    bombList = JSON.parse(JSON.stringify(activeDisplayList));
+    bombIndex = 0;
+
+    // 🛡️ 铁血防崩锁：有节点才去改样式，没有就静默跳过
+    const gradingGroup = document.getElementById('bombGradingGroup');
+    if (gradingGroup) gradingGroup.style.display = 'none';
+
+    const modeBadge = document.getElementById('bombModeBadge');
+    if (modeBadge) {
+        modeBadge.innerText = "当前页静态扫描";
+        modeBadge.style.color = "#ffa940";
+        modeBadge.style.background = "rgba(255,169,64,0.1)";
+    }
+
+    launchBombOverlay();
+    return;
+}
+
+// =========================================================================
+// 🧬 【分支 A：智能动态截击流】
+// =========================================================================
+const gradingGroup = document.getElementById('bombGradingGroup');
+if (gradingGroup) gradingGroup.style.display = 'flex';
+
+const modeBadge = document.getElementById('bombModeBadge');
+if (modeBadge) {
+    modeBadge.innerText = "实时截击流";
+    modeBadge.style.color = "var(--accent-color)";
+    modeBadge.style.background = "rgba(168,199,250,0.1)";
+}
+
         let snapshot = null;
         try {
             const res = await fetch(`${API_BASE}/snapshot/load?bookId=${currentBookId}`);
@@ -1327,6 +1956,7 @@ async function fetchMoreWordsDynamic() {
 
     async function bombPrev() {
         clearAutoTimer();
+        resetAiPanel(); // 👈 切换词前收起
         if (bombIndex > 0) {
             const currentWordObj = bombList[bombIndex];
             await triggerKillWordWordInterface(currentWordObj.word, 'prev');
@@ -1336,7 +1966,9 @@ async function fetchMoreWordsDynamic() {
         updateBombHeaderUI();
     }
 
-    function bombNext() { clearAutoTimer(); bombNextReal(); }
+    function bombNext() { clearAutoTimer();
+    resetAiPanel(); // 👈 切换词前收起
+     bombNextReal(); }
 
     async function triggerKillWordWordInterface(word, statusType) {
         try {
@@ -1354,11 +1986,20 @@ async function fetchMoreWordsDynamic() {
     function formatDefinition(def) { if (!def) return ""; return def.replace(/(vt\.|vi\.|n\.|adj\.|adv\.|prep\.|conj\.|interj\.)/g, '<br>$1').trim(); }
 
     function showBombWord(autoSpeak = true) {
+        // 关键点：每次加载新词时，AI 面板应默认为关闭状态
+        resetAiPanel();
         if (bombIndex < 0) bombIndex = 0;
         if (bombIndex >= bombList.length) {
-            fetchMoreWordsDynamic();
+          if (vm.scrollMode === 'STATIC_PAGE') {
+            isAutoMode = false;
+            updateAutoBtnUI();
+            alert(`📋 【当前页扫描完成】已到达当前页最后一个单词。`);
+            bombIndex = bombList.length - 1;
             return;
-        }
+           }
+           fetchMoreWordsDynamic();
+            return;
+         }
 
         const current = bombList[bombIndex];
         const wordEl = document.getElementById('bWord');
@@ -1376,15 +2017,126 @@ async function fetchMoreWordsDynamic() {
             wordEl.style.visibility = 'hidden';
             phoneticEl.style.visibility = 'hidden';
             transEl.classList.add('show');
+            fetchAndRenderAiAnalysis(current.word);
         } else {
             wordEl.style.visibility = 'visible';
             phoneticEl.style.visibility = 'visible';
-            if (autoShowTrans) { transEl.classList.add('show'); } else { transEl.classList.remove('show'); }
+            if (autoShowTrans) { transEl.classList.add('show');
+               fetchAndRenderAiAnalysis(current.word);
+             } else { transEl.classList.remove('show'); }
             if (autoSpeak) { speakCurrentWord(); }
         }
 
         updateBombHeaderUI();
     }
+
+// 🛰️ 原子函数：专门负责去接口捞 AI 数据并组装 DOM（铁血防御变量溢出版）
+
+async function fetchAndRenderAiAnalysis(word) {
+    const aiContainer = document.getElementById('bAiContainer');
+    if (!aiContainer) return;
+
+    // ⚡ 核心卡点 A：生成当前请求的独立时空令牌，并立刻物理清空旧 DOM 缓存，死死封堵残留视效！
+    const myAiToken = ++aiSequenceToken;
+
+    const rootsEl = document.getElementById('bAiRoots');
+    const storyEl = document.getElementById('bAiStory');
+    const familyEl = document.getElementById('bAiFamily');
+
+    if (rootsEl) rootsEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.9rem;">正在解析词根突触...</div>';
+    if (storyEl) storyEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.9rem;">AI 联想故事疯狂脑补中...</div>';
+    if (familyEl) familyEl.innerHTML = '';
+
+    try {
+        const response = await fetch(`http://localhost:8080/api/ai/analysis?word=${word}`);
+        if (!response.ok) return;
+
+        // 拿到原始数据
+        const rawData = await response.json();
+
+        // 🎯 核心卡点 B：战术熔断拦截！如果全局令牌已经变了，说明用户在此期间按了“下一个”或切了词
+        // 老子直接离场，绝对不让老数据玷污新词的屏幕！
+        if (myAiToken !== aiSequenceToken) {
+            console.warn(`⏳ [AI 战术熔断] 单词 【${word}】 的数据迟到，已被新时空轴无情抛弃。`);
+            return;
+        }
+
+        // 铁血数据桥接
+        const aiData = {
+            rootBreakdown: (rawData.root_breakdown || []).map(item => ({
+                root: item.part,
+                meaning: item.meaning
+            })),
+            memoryStory: rawData.memory_story,
+            familyWords: rawData.family_words
+        };
+
+        // 2. 组装词根拆解
+        if (rootsEl) {
+            if (aiData.rootBreakdown && aiData.rootBreakdown.length > 0) {
+                rootsEl.innerHTML = aiData.rootBreakdown.map((item, index) => {
+                    const itemHtml = `
+                        <div class="root-item">
+                            <span>${item.root || ''}</span>
+                            <small>↓</small>
+                            <p>${item.meaning || ''}</p>
+                        </div>
+                    `;
+                    if (index < aiData.rootBreakdown.length - 1) {
+                        return itemHtml + `<div class="root-plus">+</div>`;
+                    }
+                    return itemHtml;
+                }).join('');
+                if (rootsEl.parentElement) rootsEl.parentElement.style.display = 'flex';
+            } else {
+                if (rootsEl.parentElement) rootsEl.parentElement.style.display = 'none';
+            }
+        }
+
+        // 3. 注入 AI 联想故事
+        if (storyEl) {
+            if (aiData.memoryStory) {
+                storyEl.innerHTML = aiData.memoryStory;
+                if (storyEl.parentElement) storyEl.parentElement.style.display = 'flex';
+            } else {
+                if (storyEl.parentElement) storyEl.parentElement.style.display = 'none';
+            }
+        }
+
+        // 4. 组装同源家族词胶囊
+        if (familyEl) {
+            if (aiData.familyWords && aiData.familyWords.length > 0) {
+                familyEl.innerHTML = aiData.familyWords.map(item => {
+                    return `<div class="family-badge" onclick="exitBombAndSearch('${item.word}')" title="${item.meaning || ''}">${item.word}</div>`;
+                }).join('');
+                if (familyEl.parentElement) familyEl.parentElement.style.display = 'flex';
+            } else {
+                if (familyEl.parentElement) familyEl.parentElement.style.display = 'none';
+            }
+        }
+
+        // 5. 满血控制面板展现相变
+        if (isAiExpandedForCurrentWord) {
+            aiContainer.classList.add('active');
+        } else {
+            aiContainer.classList.remove('active');
+        }
+
+    } catch (e) {
+        console.error("🚀 捞取 AI 词根信息时突触断连:", e);
+        // 如果出错且令牌没变，提示用户
+        if (myAiToken === aiSequenceToken && storyEl) {
+            storyEl.innerHTML = '<span style="color:var(--accent-danger);">⚠️ 智能化突触中途断连，请稍后重试</span>';
+        }
+    }
+}
+
+// 🛠️ 战术外挂：点击家族词，直接退出当前轰炸机，在大盘定位该词（可选功能）
+function exitBombAndSearch(targetWord) {
+    exitBomb();
+    // 可以在这里写让大盘表格高亮或者搜索该词的逻辑
+    alert(`已为你准确定位同族词: ${targetWord}`);
+}
 
     function toggleTrans() {
         if (bombList.length === 0 || bombIndex >= bombList.length) return;
@@ -1409,6 +2161,36 @@ async function fetchMoreWordsDynamic() {
             if (autoShowTrans) { transEl.classList.add('show'); } else { transEl.classList.remove('show'); }
         }
     }
+
+
+
+// 📡 强制复位 AI 面板状态，并执行视觉收起
+function resetAiPanel() {
+
+    // 1. 同步逻辑状态
+    isAiExpandedForCurrentWord = false;
+
+    // 2. 获取 DOM 节点
+    const arrow = document.getElementById('bAiArrow');
+    const aiContainer = document.getElementById('bAiContainer');
+
+    // 3. 移除旋转效果
+    if (arrow) {
+        arrow.classList.remove('open');
+    }
+
+    // 4. 移除容器展开效果
+    if (aiContainer) {
+        aiContainer.classList.remove('active');
+        // 可选：为了确保 display 恢复到初始 CSS 定义，清除内联样式
+        aiContainer.style.display = '';
+    }
+}
+
+
+
+
+
 
     async function syncMainListHighlight(targetWord) {
         const index = burningWords.findIndex(item => item.word === targetWord);
@@ -1518,22 +2300,7 @@ async function fetchMoreWordsDynamic() {
         } catch (e) { alert("⚠️ 批量还原失败！"); }
     }
 
-    function handleGlobalKeydown(e) {
-        if (vm.settingVisible) return;
-        if (document.getElementById('bombOverlay').style.display !== 'flex') return;
 
-        if (e.code === 'Space') { e.preventDefault(); toggleAutoMode(); return; }
-        if (e.key === '1') { e.preventDefault(); bombGrade(0); return; }
-        if (e.key === '2') { e.preventDefault(); bombGrade(1); return; }
-        if (e.key === 'Enter') { e.preventDefault(); bombGrade(2); return; }
-
-        switch (e.code) {
-            case 'KeyQ': e.preventDefault(); toggleTrans(); break;
-            case 'ArrowLeft': e.preventDefault(); if (!isAutoMode) bombPrev(); break;
-            case 'ArrowRight': e.preventDefault(); if (!isAutoMode) bombNext(); break;
-            case 'Escape': e.preventDefault(); exitBomb(); break;
-        }
-    }
 
     window.addEventListener('DOMContentLoaded', async () => {
         try {
@@ -1551,6 +2318,12 @@ async function fetchMoreWordsDynamic() {
         document.getElementById('batchRestoreBtn').addEventListener('click', batchRestore);
         window.addEventListener('keydown', handleGlobalKeydown);
     });
+
+
+
+
+
+
 </script>
 </body>
 </html>
