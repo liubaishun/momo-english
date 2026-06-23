@@ -159,7 +159,7 @@ public class KilledWordController {
         }
 
         // 交付 Service 层，并将 source 战术下发
-        wordService.restoreWords(0L,bookId, words, source);
+        wordService.restoreWords(1L,bookId, words, source);
 
         result.put("status", "success");
         result.put("message", "成功处理 " + words.size() + " 个单词的还原请求");
