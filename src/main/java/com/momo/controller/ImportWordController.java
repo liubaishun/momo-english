@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -17,10 +16,8 @@ import java.util.stream.Stream;
  */
 @RestController
 @RequestMapping("/api/words")
+@CrossOrigin(origins = "*") // 允许前端本地跨域调用
 public class ImportWordController {
-
-    private final String DATA_FILE_PATH = System.getProperty("user.dir") + "/src/main/resources/static/books/kaoyan.json";
-
 
     @Autowired
     private WordService wordService;
@@ -51,69 +48,6 @@ public class ImportWordController {
     public Map<String, Object> addSingleWord(@RequestBody Word newWord) {
         return batchImportWords(Collections.singletonList(newWord));
     }
-
-
-    /**
-     * 1. 查询全部词库数据（已升级为流式扫描引擎，彻底杜绝 StackOverflowError）
-     */
-    @GetMapping("/import/words")
-    public List<Word> getAllWords() {
-        List<Word> list = new ArrayList<>();
-        File file = new File(DATA_FILE_PATH);
-        if (!file.exists()) return list;
-
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                sb.append(line);
-            }
-            String content = sb.toString().trim();
-            if (content.isEmpty() || "[]".equals(content)) return list;
-
-            // ================= 工业级单指针流式扫描内核 =================
-            int len = content.length();
-            int i = 0;
-            // 越过最外层数组的 '['
-            while (i < len && content.charAt(i) != '[') {
-                i++;
-            }
-            i++; // 跳过 '['
-
-            while (i < len) {
-                // 1. 寻找当前单词大括号 '{' 的起点
-                while (i < len && content.charAt(i) != '{') {
-                    if (content.charAt(i) == ']') break; // 整个数组到头了
-                    i++;
-                }
-                if (i >= len || content.charAt(i) == ']') break;
-                i++; // 越过 '{'
-
-                // 2. 截取当前大括号内部的所有键值对文本
-                StringBuilder objBlock = new StringBuilder();
-                while (i < len && content.charAt(i) != '}') {
-                    objBlock.append(content.charAt(i));
-                    i++;
-                }
-                i++; // 越过 '}'
-
-                // 3. 精准无错解析单条对象内部的属性 (不再依赖 split 产生的大型数组)
-                String blockStr = objBlock.toString().trim();
-                if (!blockStr.isEmpty()) {
-                    Word w = parseSingleWordBlock(blockStr);
-                    if (w.getWord() != null && !w.getWord().isEmpty()) {
-                        list.add(w);
-                    }
-                }
-            }
-            // =========================================================
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return list;
-    }
-
 
     /**
      * 辅助解析核心：精准逐字符提取 K-V 对，完美兼容带逗号的例句
@@ -190,7 +124,6 @@ public class ImportWordController {
     }
 
 
-
     /**
      * 3. 批量追加词汇集
      */
@@ -198,7 +131,8 @@ public class ImportWordController {
     public Map<String, Object> batchImportWords(@RequestBody List<Word> newWords) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<Word> currentWords = getAllWords();
+            List<Word> currentWords = new ArrayList<>();
+            //List<Word> currentWords = getAllWords();
             for (Word w : newWords) {
                 w.setId("momo_auto_" + UUID.randomUUID().toString().replaceAll("-", "").substring(0, 8));
                 w.setBookId("kaoyan"); // 显式设置默认状态
@@ -218,38 +152,15 @@ public class ImportWordController {
      * 4. 删除指定词条
      */
     @DeleteMapping("/words/{id}")
-    public Map<String, Object> deleteWord(@PathVariable String id) {
+    public Map<String, Object> deleteWord(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<Word> currentWords = getAllWords();
-            currentWords.removeIf(w -> w.getId().equals(id));
-            saveToFile(currentWords);
+            wordService.deleteWord(id);
             response.put("status", "success");
         } catch (Exception e) {
             response.put("status", "error");
         }
         return response;
     }
-
-    // 将全量庞大词库高效写回本地物理持久化 JSON 文件
-    private void saveToFile(List<Word> words) throws IOException {
-        File file = new File(DATA_FILE_PATH);
-        StringBuilder sb = new StringBuilder("[\n");
-        for (int i = 0; i < words.size(); i++) {
-            Word w = words.get(i);
-            // 深度清洗数据中可能导致前端冲突的换行符
-            String cleanDef = w.getDefinition().replace("\n", " ").replace("\"", "\\\"");
-            String cleanEx = w.getExample().replace("\n", " ").replace("\"", "\\\"");
-
-            sb.append(String.format("  {\"id\":\"%s\",\"word\":\"%s\",\"phonetic\":\"%s\",\"definition\":\"%s\",\"example\":\"%s\",\"category\":\"%s\"}",
-                    w.getId(), w.getWord(), w.getPhonetic(), cleanDef, cleanEx, w.getCategory()));
-            if (i < words.size() - 1) sb.append(",\n");
-        }
-        sb.append("\n]");
-        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
-            bw.write(sb.toString());
-        }
-    }
-
 
 }

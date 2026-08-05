@@ -23,6 +23,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/words")
+@CrossOrigin(origins = "*") // 允许前端本地跨域调用
 public class FilterWordController {
 
 
