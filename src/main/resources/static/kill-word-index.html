@@ -1093,7 +1093,7 @@
     };
     let currentPhase = 'none';
 
-    const API_BASE = "http://localhost:8080/api/words";
+    const API_BASE = "/api/words";
     let currentBookId = "";
     let tacticalRemainingMillis = 0;
 
@@ -1959,23 +1959,25 @@ if (modeBadge) {
         resetAiPanel(); // 👈 切换词前收起
         if (bombIndex > 0) {
             const currentWordObj = bombList[bombIndex];
-            await triggerKillWordWordInterface(currentWordObj.word, 'prev');
+            // await triggerKillWordWordInterface(currentWordObj.word, 'prev');
             bombIndex--;
             if (isAutoMode) { executeAutoStep(); } else { showBombWord(); playCurrentWordAudio(); }
         }
         updateBombHeaderUI();
     }
 
-    function bombNext() { clearAutoTimer();
-    resetAiPanel(); // 👈 切换词前收起
-     bombNextReal(); }
+    function bombNext() {
+         clearAutoTimer();
+         resetAiPanel(); // 👈 切换词前收起
+         bombNextReal();
+     }
 
     async function triggerKillWordWordInterface(word, statusType) {
         try {
             await fetch(`${API_BASE}/kill/kill`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ book: currentBookId, word: word, status: statusType, source: 'bomb' })
+                body: JSON.stringify({ book: currentBookId, word: word, status: statusType, source: 'bomb', currentTick: globalTick })
             });
         } catch (err) {
             console.error("💥 铁血斩杀总线异常:", err);
@@ -2048,7 +2050,7 @@ async function fetchAndRenderAiAnalysis(word) {
     if (familyEl) familyEl.innerHTML = '';
 
     try {
-        const response = await fetch(`http://localhost:8080/api/ai/analysis?word=${word}`);
+        const response = await fetch(`${API_BASE}/api/ai/analysis?word=${word}`);
         if (!response.ok) return;
 
         // 拿到原始数据

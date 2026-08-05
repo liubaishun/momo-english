@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: 'd80f45a3adbb2ea8b6a61a6a98161897',
+        }
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=dc2d71a7cff25a3348bd13bb8233e369"></script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏛️ 烟火重燃 · 全球香肠微观数字艺术馆</title>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@antv/l7"></script>
+
+    <style>
+        :root {
+            --gold: #dfb76c;
+            --meat-red: #9e2a2b;
+            --glow-red: #ff4d4d;
+            --bg-dark: #050202;
+            --panel-bg: rgba(10, 5, 5, 0.95);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Cinzel', 'STKaiti', serif; background: var(--bg-dark); color: #fff; overflow: hidden; }
+
+        #app { width: 100vw; height: 100vh; position: relative; }
+        #map-container { width: 100%; height: 100%; background: var(--bg-dark); z-index: 1; }
+
+        /* 👑 顶部：数字策展宣言 */
+        .museum-header {
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            text-align: center; z-index: 10; pointer-events: none;
+        }
+        .museum-header h1 {
+            font-size: 32px; letter-spacing: 6px; color: var(--gold);
+            text-shadow: 0 0 20px rgba(223, 183, 108, 0.4); font-weight: 300;
+        }
+        .museum-header p { font-size: 12px; color: #665; text-transform: uppercase; margin-top: 5px; letter-spacing: 3px; }
+
+        /* 🎛️ 右侧悬浮折叠切换按钮 */
+        .toggle-dashboard-btn {
+            position: absolute; right: 25px; top: 25px; z-index: 101;
+            background: var(--panel-bg); border: 1px solid rgba(223,183,108,0.4);
+            color: var(--gold); padding: 12px 16px; border-radius: 8px;
+            font-size: 12px; font-family: 'STKaiti'; cursor: pointer; letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;
+        }
+        .toggle-dashboard-btn:hover {
+            border-color: var(--glow-red); color: #fff; box-shadow: 0 0 15px rgba(255, 77, 77, 0.3);
+        }
+
+        /* 🎛️ 控制面板基础样式 */
+        .control-dashboard {
+            position: absolute; right: -380px; top: 85px; width: 340px; background: var(--panel-bg);
+            border: 1px solid rgba(223,183,108,0.2); backdrop-filter: blur(20px);
+            border-radius: 12px; padding: 25px; z-index: 100;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+            max-height: calc(100vh - 150px); display: flex; flex-direction: column;
+            opacity: 0; visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        /* 当展开状态激活时的样式占位 */
+        .control-dashboard.is-expanded {
+            right: 25px; opacity: 1; visibility: visible;
+        }
+
+        .section-title { font-size: 13px; color: var(--gold); margin-bottom: 15px; letter-spacing: 1px; display: flex; justify-content: space-between; flex-shrink: 0; }
+        .search-group { margin-bottom: 20px; flex-shrink: 0; }
+        .search-input {
+            width: 100%; background: #140d0d; border: 1px solid rgba(223,183,108,0.2);
+            color: #fff; padding: 10px 12px; border-radius: 6px; font-size: 12px; outline: none;
+            transition: all 0.3s;
+        }
+        .search-input:focus { border-color: var(--glow-red); box-shadow: 0 0 10px rgba(255, 77, 77, 0.2); }
+        .filter-group { margin-bottom: 18px; flex-shrink: 0; }
+        .filter-label { font-size: 11px; color: #8a8880; display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .filter-slider { width: 100%; accent-color: var(--glow-red); background: #221a1a; height: 4px; border-radius: 2px; outline: none; -webkit-appearance: none; }
+
+        .rank-select { width: 100%; background: #140d0d; border: 1px solid rgba(223,183,108,0.2); color: #fff; padding: 10px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer; flex-shrink: 0; }
+        .rank-list { margin-top: 15px; overflow-y: auto; padding-right: 5px; flex-grow: 1; }
+        .rank-list::-webkit-scrollbar { width: 4px; }
+        .rank-list::-webkit-scrollbar-thumb { background: rgba(223,183,108,0.2); border-radius: 2px; }
+        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; font-size: 12px; }
+        .rank-item:hover { background: rgba(158, 42, 43, 0.2); }
+        .rank-item.active { background: rgba(255, 77, 77, 0.15); border-left: 2px solid var(--glow-red); }
+        .rank-index { width: 20px; color: var(--gold); font-family: monospace; }
+        .rank-name { flex: 1; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-right: 10px; }
+        .rank-val { color: var(--glow-red); font-family: monospace; }
+
+        /* 🖼️ 底部：全场景微观藏品解构舱 */
+        .exhibit-capsule {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: 900px; height: 340px; background: rgba(10, 5, 5, 0.9);
+            border: 1px solid rgba(223,183,108,0.2); backdrop-filter: blur(25px);
+            border-radius: 16px; padding: 25px; z-index: 10;
+            display: flex; gap: 25px; box-shadow: 0 30px 60px rgba(0,0,0,0.9);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* 🔬 左侧：微观粒子实验室 */
+        .micro-lab-window {
+            width: 240px; height: 100%; background: #000; border-radius: 12px;
+            border: 1px solid rgba(158, 42, 43, 0.4); position: relative; overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(255,0,0,0.2); flex-shrink: 0;
+        }
+        .particle-smoke {
+            position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 120%, rgba(158, 42, 43, 0.3) 0%, transparent 70%);
+            animation: smokeRise 4s infinite linear; filter: blur(8px);
+        }
+
+        /* 📝 右侧：知识解构核心区 */
+        .exhibit-info { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .info-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(223,183,108,0.15); padding-bottom: 10px; flex-shrink: 0; }
+        .info-title { font-size: 24px; color: var(--glow-red); font-weight: bold; }
+        .info-tag { font-size: 11px; border: 1px solid var(--gold); color: var(--gold); padding: 2px 8px; border-radius: 3px; text-transform: uppercase; }
+
+        /* 📖 内嵌标签导航系统 */
+        .knowledge-tabs { display: flex; gap: 10px; margin-top: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; }
+        .k-tab-btn { background: none; border: none; color: #887; font-size: 12px; padding: 6px 12px; cursor: pointer; transition: all 0.3s; font-family: 'STKaiti'; letter-spacing: 1px; }
+        .k-tab-btn:hover { color: #fff; }
+        .k-tab-btn.active { color: var(--gold); border-bottom: 2px solid var(--gold); font-weight: bold; }
+
+        /* 📊 表格 */
+        .knowledge-content-view { flex: 1; overflow-y: auto; margin: 12px 0; display: flex; align-items: center; justify-content: center; }
+        .science-table {
+            width: 95%; margin: 0 auto; border-collapse: collapse; text-align: center; font-size: 13px; color: #dcd0d0; background: rgba(255,255,255,0.02); border-radius: 6px; overflow: hidden;
+        }
+        .science-table th, .science-table td { padding: 10px 14px; border: 1px solid rgba(223, 183, 108, 0.15); text-align: center; vertical-align: middle; }
+        .science-table th { background: rgba(158, 42, 43, 0.2); color: var(--gold); font-weight: bold; font-size: 12px; letter-spacing: 1px; }
+        .science-table tr:hover { background: rgba(255, 255, 255, 0.05); }
+        .table-highlight { color: var(--glow-red); font-weight: bold; }
+
+        /* 🧪 理化特征芯片 */
+        .chem-chips { display: flex; gap: 12px; flex-shrink: 0; }
+        .chip {
+            background: rgba(158, 42, 43, 0.1); border: 1px solid rgba(158, 42, 43, 0.3);
+            padding: 8px 15px; border-radius: 8px; flex: 1; text-align: center;
+        }
+        .chip-val { font-size: 16px; color: var(--gold); font-weight: bold; font-family: monospace; }
+        .chip-label { font-size: 10px; color: #887; }
+
+        @keyframes smokeRise {
+            0% { transform: translateY(20px) scale(0.9); opacity: 0; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="museum-header">
+        <h1>THE SAUSAGE ARTIFACTS</h1>
+        <p>全球名产风土与微观数据分析展位</p>
+    </div>
+
+    <button class="toggle-dashboard-btn" @click="isDashboardExpanded = !isDashboardExpanded">
+        <span>{{ isDashboardExpanded ? '✕ 关闭控制台' : '🎛️ 风味感官调音台' }}</span>
+    </button>
+
+    <div class="control-dashboard" :class="{ 'is-expanded': isDashboardExpanded }">
+        <div class="section-title">
+            <span>🎛️ 风味感官调音台</span>
+            <span style="color: #665; font-family: monospace;">TOTAL: {{ countryFamousArtifacts.length }}</span>
+        </div>
+        <div class="search-group">
+            <input type="text" class="search-input" v-model="searchQuery" placeholder="检索三大标本名称或工艺..." @input="applyFilters">
+        </div>
+        <div class="filter-group">
+            <div class="filter-label"><span>🌲 最低烟熏聚积度</span><span>{{ filters.minPhenols }} ppm</span></div>
+            <input type="range" class="filter-slider" v-model.number="filters.minPhenols" min="0" max="50" @input="applyFilters">
+        </div>
+        <div class="filter-group">
+            <div class="filter-label"><span>💧 最大水分活度上限</span><span>{{ filters.maxAw }} Aw</span></div>
+            <input type="range" class="filter-slider" v-model.number="filters.maxAw" min="0.60" max="0.95" step="0.01" @input="applyFilters">
+        </div>
+
+        <div class="section-title" style="margin-top: 10px;">
+            <span>🏆 风味数据天梯层</span>
+            <span style="color: var(--glow-red);">FILTERED: {{ filteredData.length }}</span>
+        </div>
+        <select class="rank-select" v-model="rankMode" @change="reRank">
+            <option value="hardcore">物理重口味天梯 (14-pH + 酚类)</option>
+            <option value="preservation">极干控水储藏天梯 (Aw倒序)</option>
+            <option value="acid">微生态自然熟成天梯 (pH酸度)</option>
+        </select>
+        <div class="rank-list">
+            <div class="rank-item" :class="{ active: currentArtifact && item.id === currentArtifact.id }" v-for="(item, idx) in rankList" :key="item.id" @click="focusOnSausage(item)">
+                <span class="rank-index">{{ idx + 1 }}</span>
+                <span class="rank-name">{{ item.name }}</span>
+                <span class="rank-val">{{ getRankValue(item) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="map-container"></div>
+
+    <div class="exhibit-capsule" v-if="currentArtifact">
+        <div class="micro-lab-window">
+            <div class="particle-smoke"></div>
+            <div :style="microWindowStyle" style="position: absolute; width: 100%; height: 100%; transition: all 1s;"></div>
+            <img v-if="currentArtifact.image" :src="currentArtifact.image" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.4; mix-blend-mode: luminosity;" />
+            <div style="position: absolute; bottom: 10px; left: 10px; font-size: 10px; color: var(--gold); font-family: monospace; letter-spacing: 1px;">⚙️ MICRO-ENVIRONMENT ACTIVE</div>
+        </div>
+
+        <div class="exhibit-info">
+            <div class="info-header">
+                <div>
+                    <div class="info-title">{{ currentArtifact.name }}</div>
+                    <div style="font-size: 12px; color: #776; margin-top: 3px;">ORIGIN: {{ currentArtifact.origin }} [{{ currentArtifact.lng }}, {{ currentArtifact.lat }}]</div>
+                </div>
+                <div class="info-tag">{{ currentArtifact.processType }}</div>
+            </div>
+
+            <div class="knowledge-tabs">
+                <button class="k-tab-btn" :class="{ active: activeTab === 'science' }" @click="activeTab = 'science'">🧬 硬核科学理化</button>
+                <button class="k-tab-btn" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">📜 风土人文溯源</button>
+                <button class="k-tab-btn" :class="{ active: activeTab === 'craft' }" @click="activeTab = 'craft'">🏺 工艺分子谱图</button>
+            </div>
+
+            <div class="knowledge-content-view">
+                <table class="science-table" v-if="activeTab === 'science'">
+                    <thead>
+                    <tr>
+                        <th>分析维度</th>
+                        <th>核心机制描述说明</th>
+                        <th>状态判定</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td class="table-highlight">微生态运作学</td>
+                        <td>环境维持在酸度 pH {{ currentArtifact.ph }} 的黄金发酵期，大分子蛋白质正高速转换为游离氨基酸。</td>
+                        <td>活性熟成中</td>
+                    </tr>
+                    <tr>
+                        <td class="table-highlight">菌群代谢</td>
+                        <td>优势接种的植物乳杆菌正处于全量有氧代谢期，水解产生的微量酸能长效降解亚硝酸盐。</td>
+                        <td>高度安全</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <table class="science-table" v-if="activeTab === 'history'">
+                    <thead>
+                    <tr>
+                        <th>人文视角</th>
+                        <th>地缘与风物人类学考据数据</th>
+                        <th>地理坐标</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td class="table-highlight">生存物候学</td>
+                        <td>该样本起源于古代缺乏冷藏机制时对鲜肉保护的渴望，是老一辈对时间与空气物理学的硬核摸索。</td>
+                        <td>[{{ currentArtifact.lng }}, {{ currentArtifact.lat }}]</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <table class="science-table" v-if="activeTab === 'craft'">
+                    <thead>
+                    <tr>
+                        <th>质谱测定项</th>
+                        <th>高阶工艺有机分子沉淀图谱</th>
+                        <th>峰值浓度</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td class="table-highlight">烟熏有机物</td>
+                        <td>在木材半炭化升华阶段，表皮微孔完美吸附了标志性的愈创木酚与 4-甲基愈创木酚。</td>
+                        <td>{{ currentArtifact.phenols }} ppm</td>
+                    </tr>
+                    <tr>
+                        <td class="table-highlight">水分脱水率</td>
+                        <td>细胞外壁天然肠衣屏障在脱水率控制在 {{ (100 - currentArtifact.aw * 100).toFixed(0) }}% 的情况下，维持了完美的网状交叉蛋白质。</td>
+                        <td>全量达标</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="chem-chips">
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.ph }}</div>
+                    <div class="chip-label">熟成酸度 (pH)</div>
+                </div>
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.aw }}</div>
+                    <div class="chip-label">水分活度 (Aw)</div>
+                </div>
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.phenols }} ppm</div>
+                    <div class="chip-label">酚类聚积度</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+
+    createApp({
+        setup() {
+            const activeIndex = ref(0);
+            const activeTab = ref('science');
+            const isDashboardExpanded = ref(true); // 🛠️ 关键更改：默认直接展开控制台
+            let scene = null;
+            let pointLayer = null;
+
+            const countryFamousArtifacts = [
+                { id: 3001, name: "四川柏丫烟熏肠", origin: "中国 · 四川盆地", lng: 104.066, lat: 30.572, processType: "低温重木熏制", image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500", glowColor: "rgba(158, 42, 43, 0.5)", ph: 5.2, aw: 0.82, phenols: 45 },
+                { id: 3002, name: "意大利经典萨拉米", origin: "欧洲 · 摩德纳窖藏", lng: 10.925, lat: 44.647, processType: "微生物真菌固态发酵", image: "https://images.unsplash.com/photo-1629115911442-70b99ffec35b?w=500", glowColor: "rgba(210, 180, 140, 0.3)", ph: 4.8, aw: 0.78, phenols: 2 },
+                { id: 3003, name: "广式高粱酒风干肠", origin: "中国 · 岭南平原", lng: 113.264, lat: 23.129, processType: "低氧自然控水烘脱", image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=500", glowColor: "rgba(235, 94, 40, 0.4)", ph: 5.6, aw: 0.85, phenols: 0 }
+            ];
+
+            const filteredData = ref([...countryFamousArtifacts]);
+            const searchQuery = ref('');
+            const filters = ref({ minPhenols: 0, maxAw: 0.95 });
+            const rankMode = ref('hardcore');
+
+            const currentArtifact = computed(() => {
+                return filteredData.value.length > 0 ? filteredData.value[activeIndex.value] : null;
+            });
+            const rankList = computed(() => filteredData.value);
+
+            const microWindowStyle = computed(() => {
+                if (!currentArtifact.value) return {};
+                const color = currentArtifact.value.glowColor || 'rgba(158, 42, 43, 0.5)';
+                return {
+                    background: `radial-gradient(circle at center, ${color} 0%, transparent 80%)`,
+                    mixBlendMode: 'screen'
+                };
+            });
+
+            const playTechSound = () => {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            };
+
+            const initEpicMap = () => {
+                scene = new L7.Scene({
+                    id: 'map-container',
+                    map: new L7.GaodeMap({
+                        style: 'amap://styles/darkhide',
+                        center: [105, 35], zoom: 3.5, token: 'YOUR_AMAP_KEY'
+                    })
+                });
+
+                scene.on('loaded', () => {
+                    pointLayer = new L7.PointLayer({})
+                        .source(countryFamousArtifacts, { parser: { type: 'json', x: 'lng', y: 'lat' } })
+                        .shape('circle')
+                        .size(15)
+                        .color('id', id => {
+                            if (currentArtifact.value && id === currentArtifact.value.id) {
+                                return 'var(--glow-red)';
+                            }
+                            return 'rgba(255, 77, 77, 0.7)';
+                        })
+                        .style({
+                            opacity: 1.0,
+                            stroke: '#ffffff',
+                            strokeWidth: 1.5,
+                            glow: { color: 'var(--glow-red)', radius: 15 }
+                        });
+
+                    pointLayer.on('click', ext => {
+                        focusOnSausage(ext.feature);
+                    });
+
+                    scene.addLayer(pointLayer);
+                    flyToTarget();
+                });
+            };
+
+            watch(currentArtifact, () => {
+                if (pointLayer) {
+                    pointLayer.color('id', id => {
+                        if (currentArtifact.value && id === currentArtifact.value.id) {
+                            return 'var(--glow-red)';
+                        }
+                        return 'rgba(255, 77, 77, 0.6)';
+                    });
+                    scene.render();
+                }
+            });
+
+            const applyFilters = () => {
+                const query = searchQuery.value.trim().toLowerCase();
+
+                filteredData.value = countryFamousArtifacts.filter(item => {
+                    const textMatched = !query || item.name.toLowerCase().includes(query) || item.processType.toLowerCase().includes(query);
+                    const numMatched = item.phenols >= filters.value.minPhenols && item.aw <= filters.value.maxAw;
+                    return textMatched && numMatched;
+                });
+                activeIndex.value = 0;
+                reRank();
+                flyToTarget();
+            };
+
+            const reRank = () => {
+                if (rankMode.value === 'hardcore') {
+                    filteredData.value.sort((a, b) => ((14 - a.ph) + a.phenols) - ((14 - b.ph) + b.phenols));
+                } else if (rankMode.value === 'preservation') {
+                    filteredData.value.sort((a, b) => a.aw - b.aw);
+                } else if (rankMode.value === 'acid') {
+                    filteredData.value.sort((a, b) => a.ph - b.ph);
+                }
+            };
+
+            const getRankValue = (item) => {
+                if (rankMode.value === 'hardcore') return `${((14 - item.ph) + item.phenols).toFixed(1)} Pts`;
+                if (rankMode.value === 'preservation') return `${item.aw} Aw`;
+                if (rankMode.value === 'acid') return `pH ${item.ph}`;
+            };
+
+            const focusOnSausage = (target) => {
+                const foundIdx = filteredData.value.findIndex(a => a.id === target.id);
+                if (foundIdx !== -1) {
+                    activeIndex.value = foundIdx;
+                    playTechSound();
+                    activeTab.value = 'science';
+                    flyToTarget();
+                }
+            };
+
+            const flyToTarget = () => {
+                if (!currentArtifact.value) return;
+                const target = currentArtifact.value;
+                scene.setCenter([target.lng, target.lat], { duration: 1200 });
+                scene.setZoom(target.id === 3002 ? 4.5 : 5.5);
+            };
+
+            onMounted(() => {
+                reRank();
+                initEpicMap();
+            });
+
+            return {
+                activeIndex, currentArtifact, microWindowStyle, activeTab, isDashboardExpanded,
+                filteredData, searchQuery, filters, rankMode, rankList, countryFamousArtifacts,
+                focusOnSausage, applyFilters, reRank, getRankValue
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+
+
+
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '你的安全密钥(Secret)', // 🛠️ 在这里填入你申请到的【安全密钥】
+        }
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=d80f45a3adbb2ea8b6a61a6a98161897"></script>
+
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏛️ 云端香肠奇妙博物馆 | Digital Sausage Museum</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=dc2d71a7cff25a3348bd13bb8233e369"></script>
+    <script src="https://unpkg.com/@antv/l7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', 'Georgia', 'STKaiti', serif; background: #0f0b0b; color: #f5e6e6; overflow: hidden; }
+        
+        #app { display: flex; width: 100vw; height: 100vh; position: relative; }
+        
+        /* 博物馆大厅（地图区域） */
+        #map-container { flex: 1; height: 100%; background: #050303; }
+
+        /* 顶部中央：展厅切换导航栏 */
+        .museum-nav {
+            position: absolute; top: 20px; left: 45%; transform: translateX(-50%);
+            display: flex; gap: 15px; background: rgba(30, 15, 15, 0.9);
+            padding: 8px 20px; border-radius: 30px; border: 1px solid #8c2525;
+            z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+        .nav-item {
+            padding: 6px 16px; border-radius: 20px; font-size: 14px; cursor: pointer;
+            transition: all 0.3s; color: #cba8a8; border: 1px solid transparent;
+        }
+        .nav-item.active { background: #8c2525; color: gold; border-color: gold; font-weight: bold; }
+
+        /* 右侧：藏品详情与知识考据面板 */
+        .museum-panel {
+            width: 450px; height: 100%; background: linear-gradient(180deg, #1a0f0f 0%, #0d0606 100%);
+            border-left: 2px solid #5a1818; padding: 35px 25px; display: flex; flex-direction: column;
+            box-shadow: -10px 0 40px rgba(0,0,0,0.9); z-index: 10; overflow-y: auto;
+        }
+        
+        /* 展品铭牌 UI */
+        .exhibit-plate { border: 1px solid #5a1818; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 4px; margin-bottom: 20px; position: relative;}
+        .exhibit-title { font-size: 26px; color: #ff5555; font-weight: bold; font-family: 'STKaiti'; }
+        .exhibit-meta { font-size: 13px; color: #b59393; margin-top: 5px; font-style: italic; }
+        .audio-guide-btn { position: absolute; right: 15px; top: 15px; background: none; border: 1px solid gold; color: gold; padding: 3px 8px; border-radius: 12px; font-size: 12px; cursor: pointer;}
+        
+        /* 展品3D拟真透视墙 */
+        .exhibit-display { width: 100%; height: 180px; overflow: hidden; border-radius: 6px; box-shadow: inset 0 0 20px #000; margin-bottom: 20px; border: 1px solid #331a1a; }
+        .exhibit-img { width: 100%; height: 100%; object-fit: cover; transition: all 0.6s ease; filter: sepia(20%) brightness(90%); }
+        .exhibit-display:hover .exhibit-img { transform: scale(1.05); filter: sepia(0%) brightness(100%); }
+
+        /* 知识图谱/风味图表 */
+        .section-title { font-size: 15px; color: gold; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; font-weight: bold;}
+        .chart-container { width: 100%; height: 180px; background: rgba(0,0,0,0.5); border-radius: 6px; padding: 10px; margin-bottom: 20px; border: 1px solid #2a1414; }
+        
+        /* 标本考据卡片 */
+        .knowledge-card { background: rgba(255,255,255,0.03); border-left: 3px solid gold; padding: 12px; border-radius: 0 6px 6px 0; font-size: 14px; line-height: 1.6; color: #ddd; margin-bottom: 20px;}
+        .chemistry-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .tag { background: #3a1c1c; color: #ff9999; font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid #5a2c2c;}
+
+        /* 互动装置按钮 */
+        .interact-bar { display: flex; gap: 10px; margin-top: auto; padding-top: 15px; }
+        .btn-museum { flex: 1; padding: 12px; border: 1px solid #8c2525; background: transparent; color: #ff9999; cursor: pointer; border-radius: 4px; font-weight: bold; transition: all 0.3s; }
+        .btn-museum:hover { background: #8c2525; color: white; box-shadow: 0 0 15px rgba(140,37,37,0.5); }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="museum-nav">
+        <div v-for="hall in halls" :key="hall.id" 
+             :class="['nav-item', currentHall === hall.id ? 'active' : '']"
+             @click="switchHall(hall.id)">
+            {{ hall.name }}
+        </div>
+    </div>
+
+    <div id="map-container"></div>
+
+    <div class="museum-panel" v-if="currentExhibit">
+        <div class="exhibit-plate">
+            <div class="exhibit-title">编号#{{currentExhibit.id}} · {{ currentExhibit.name }}</div>
+            <div class="exhibit-meta">馆藏归属：{{ currentExhibit.region }} | 工艺流派：{{ currentExhibit.process }}</div>
+            <button class="audio-guide-btn" @click="startAudioGuide">🎧 语音导览</button>
+        </div>
+        
+        <div class="exhibit-display">
+            <img :src="currentExhibit.cover" class="exhibit-img" alt="馆藏照片">
+        </div>
+        
+        <div class="section-title">📊 物质理化指标（Chemical & Flavor Profile）</div>
+        <div class="chart-container">
+            <canvas id="museumRadar"></canvas>
+        </div>
+
+        <div class="section-title">📜 地理与微生物考据（Anthropological Lore）</div>
+        <div class="knowledge-card">
+            <strong>【馆藏概述】</strong>{{ currentExhibit.lore }}
+            <div class="chemistry-tags">
+                <span class="tag" v-for="t in currentExhibit.tags">🧪 {{t}}</span>
+            </div>
+        </div>
+
+        <div class="section-title">🕹️ 数字显微镜互动（Interactive Micro-Lab）</div>
+        <div class="interact-bar">
+            <button class="btn-museum" @click="interact('micro')">🔍 观察微生物发酵</button>
+            <button class="btn-museum" @click="interact('collect')">🏺 收入私人标本夹</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, onMounted, nextTick, watch } = Vue;
+
+    createApp({
+        setup() {
+            const currentHall = ref("china-south"); // 默认展厅
+            const currentExhibit = ref(null);
+            let radarChart = null;
+            let scene = null;
+            let pointLayer = null;
+
+            // 🏛️ 展厅定义
+            const halls = [
+                { id: "china-south", name: "🏮 华南·风干与醇甜展厅" },
+                { id: "china-north", name: "🌲 北国·烟熏与蒜香展厅" },
+                { id: "europe", name: "🏰 欧罗巴·发酵与风土展厅" }
+            ];
+
+            // 🏺 硬核博物馆馆藏数据库（有趣、有味、有知识）
+            const museumDatabase = {
+                "china-south": [
+                    { id: 2001, name: "广式白甜腊肠", region: "中国广东", lng: 113.264, lat: 23.129, process: "天然固化风干", cover: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=500", lore: "【气候物理学】广式腊肠是典型的‘自然控水结晶’。珠三角秋季北风干燥、阳光和煦，水分在低气温下缓慢蒸发，既保留了肌纤维的弹性，又使加入的玫瑰露酒与甘蔗糖发生完美的‘美拉德反应’，形成透亮的琥珀色泽。", flavor: [1, 5, 2, 1, 4], tags: ["高粱酒醇化", "蔗糖控水", "美拉德反应"] },
+                    { id: 2002, name: "浙江遂昌长粽肠", region: "中国浙江", lng: 119.273, lat: 28.593, process: "草木灰协同干制", cover: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500", lore: "【民间化学】将传统粽叶的清香注入肠体，制作时混入特定比例的草木灰浸出液。草木灰中的弱碱性碳酸钾能使肉质的蛋白质产生轻微变性，使得口感在紧实中带有独特的山野碱香与软糯感。", flavor: [1, 2, 3, 2, 2], tags: ["草木灰碱化", "粽叶精油提取", "非遗手作"] }
+                ],
+                "china-north": [
+                    { id: 2003, name: "哈尔滨红肠", region: "中国黑龙江", lng: 126.642, lat: 45.756, process: "椴木两期烟熏", cover: "https://images.unsplash.com/photo-1585325701165-351af916e5ec?w=500", lore: "【有机化学与烟熏美学】哈尔滨红肠采用红松或椴木硬火烘烤。木材在250-300℃半炭化时释放出的‘愈创木酚’和‘4-甲基愈创木酚’是其标志性烟熏味的来源，大蒜中的‘蒜素’在高温下转化为大蒜硫醚，赋予其醇厚的北国风情。", flavor: [2, 1, 4, 5, 2], tags: ["愈创木酚沉淀", "大蒜素衍生", "欧式硬熏"] }
+                ],
+                "europe": [
+                    { id: 2004, name: "意大利萨拉米 (Salami)", region: "意大利摩德纳", lng: 10.925, lat: 44.647, process: "乳酸菌长期霉菌发酵", cover: "https://images.unsplash.com/photo-1629115911442-70b99ffec35b?w=500", lore: "【微生物学】萨拉米是不经过任何烹煮的‘活体发酵艺术’。通过接种葡萄球菌和乳酸菌，在严格控温控湿的地下窖藏中陈化数月。肉体表面覆盖的白色‘半裸乳霉菌’外衣能够防止脂肪过度氧化，并将蛋白质降解为丰富的游离氨基酸，产生极致的‘鲜（Umami）’味。", flavor: [1, 1, 5, 1, 3], tags: ["葡萄球菌降解", "白霉菌外衣", "窖藏陈化"] }
+                ]
+            };
+
+            // 🎧 数字化有声语音导览
+            const startAudioGuide = () => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // 停止当前正在播放的
+                    const text = `${currentExhibit.value.name}。馆藏概述：${currentExhibit.value.lore}`;
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.95; // 稳重的博物馆讲解员语速
+                    utterance.pitch = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    alert("您的浏览器不支持有声导览功能。");
+                }
+            };
+
+            // 展厅切换逻辑
+            const switchHall = (hallId) => {
+                currentHall.value = hallId;
+                const exhibits = museumDatabase[hallId];
+                currentExhibit.value = exhibits[0]; // 默认切换到该展厅第一个展品
+                
+                // 地图打卡点更新
+                if (pointLayer) {
+                    pointLayer.setData(exhibits);
+                    // 视角飞越到第一个展品
+                    scene.setCenter([currentExhibit.value.lng, currentExhibit.value.lat], { duration: 1200 });
+                    scene.setZoom(hallId === 'europe' ? 4 : 5.5);
+                }
+                
+                nextTick(() => { updateRadar(currentExhibit.value.flavor); });
+            };
+
+            const initMuseumMap = () => {
+                scene = new L7.Scene({
+                    id: 'map-container',
+                    map: new L7.GaodeMap({
+                        style: 'amap://styles/grey', // 使用偏学术、地理质感的灰色高德沙盘
+                        center: [105, 35],
+                        zoom: 4,
+                        token: 'YOUR_AMAP_KEY'
+                    })
+                });
+
+                scene.on('loaded', () => {
+                    const exhibits = museumDatabase[currentHall.value];
+                    currentExhibit.value = exhibits[0];
+
+                    pointLayer = new L7.PointLayer({})
+                        .source(exhibits, { parser: { type: 'json', x: 'lng', y: 'lat' } })
+                        .shape('circle')
+                        .size(16)
+                        .color('#8c2525') // 博物馆红斑
+                        .active({ color: 'gold' })
+                        .style({ opacity: 0.9, stroke: 'gold', strokeWidth: 2 });
+
+                    pointLayer.on('click', ext => {
+                        window.speechSynthesis.cancel(); // 切换时停止声音
+                        const exhibit = ext.feature;
+                        currentExhibit.value = exhibit;
+                        scene.setCenter([exhibit.lng, exhibit.lat], { duration: 800 });
+                        nextTick(() => { updateRadar(exhibit.flavor); });
+                    });
+
+                    scene.addLayer(pointLayer);
+                    nextTick(() => { updateRadar(currentExhibit.value.flavor); });
+                });
+            };
+
+            const updateRadar = (flavorData) => {
+                const ctx = document.getElementById('museumRadar').getContext('2d');
+                if (radarChart) radarChart.destroy();
+
+                radarChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['酸度(pH值)', '醇甜度', '盐度(NaCl)', '酚类(烟熏)', '脂质比'],
+                        datasets: [{
+                            label: '理化指标',
+                            data: flavorData,
+                            backgroundColor: 'rgba(140, 37, 37, 0.25)',
+                            borderColor: 'gold',
+                            borderWidth: 1.5,
+                            pointBackgroundColor: '#ff5555'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                grid: { color: '#332222' },
+                                angleLines: { color: '#332222' },
+                                ticks: { display: false },
+                                pointLabels: { color: '#cba8a8', font: { size: 12 } },
+                                min: 0, max: 5
+                            }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            };
+
+            const interact = (action) => {
+                if (action === 'micro') {
+                    alert(`【显微实验室】正在放大 4000x... \n当前观察到：大量乳酸菌正在分解糖分产生乳酸，pH值降至4.8，亚硝酸盐正在被降解，肉质安全度正在上升！`);
+                } else {
+                    alert(`【馆藏收藏】已成功将【${currentExhibit.value.name}】加入您的云端学术标本夹。`);
+                }
+            };
+
+            onMounted(() => {
+                initMuseumMap();
+            });
+
+            return { halls, currentHall, currentExhibit, switchHall, startAudioGuide, interact };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

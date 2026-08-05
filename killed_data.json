@@ -1,5 +1,375 @@
 {
-  "kaoyan" : [ ],
-  "gaokao" : [ "abandon", "abolish", "evaluate" ],
-  "zhongkao" : [ "1", "2", "abandon", "word" ]
+  "kaoyan" : {
+    "various" : {
+      "id" : null,
+      "word" : null,
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "easy",
+      "lastReview" : 1781623781567
+    },
+    "variable" : {
+      "id" : null,
+      "word" : "variable",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "design" : {
+      "id" : null,
+      "word" : "design",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "significant" : {
+      "id" : null,
+      "word" : "significant",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "significance" : {
+      "id" : null,
+      "word" : "significance",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "operation" : {
+      "id" : null,
+      "word" : "operation",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "operational" : {
+      "id" : null,
+      "word" : "operational",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technique" : {
+      "id" : null,
+      "word" : "technique",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technical" : {
+      "id" : null,
+      "word" : "technical",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technician" : {
+      "id" : null,
+      "word" : "technician",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "attribute" : {
+      "id" : null,
+      "word" : "attribute",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "contribute" : {
+      "id" : null,
+      "word" : "contribute",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "output" : {
+      "id" : null,
+      "word" : "output",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outlook" : {
+      "id" : null,
+      "word" : "outlook",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outcome" : {
+      "id" : null,
+      "word" : "outcome",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outlet" : {
+      "id" : null,
+      "word" : "outlet",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "mechanical" : {
+      "id" : null,
+      "word" : "mechanical",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "mechanism" : {
+      "id" : null,
+      "word" : "mechanism",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "facilitate" : {
+      "id" : null,
+      "word" : "facilitate",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "certificate" : {
+      "id" : null,
+      "word" : "certificate",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "qualification" : {
+      "id" : null,
+      "word" : "qualification",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    }
+  },
+  "cet6" : {
+    "facilitate" : {
+      "id" : null,
+      "word" : "facilitate",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technical" : {
+      "id" : null,
+      "word" : "technical",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "contribute" : {
+      "id" : null,
+      "word" : "contribute",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "certificate" : {
+      "id" : null,
+      "word" : "certificate",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "operational" : {
+      "id" : null,
+      "word" : "operational",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technique" : {
+      "id" : null,
+      "word" : "technique",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "mechanical" : {
+      "id" : null,
+      "word" : "mechanical",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "technician" : {
+      "id" : null,
+      "word" : "technician",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "significant" : {
+      "id" : null,
+      "word" : "significant",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "significance" : {
+      "id" : null,
+      "word" : "significance",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "output" : {
+      "id" : null,
+      "word" : "output",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "various" : {
+      "id" : null,
+      "word" : "various",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "design" : {
+      "id" : null,
+      "word" : "design",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "variable" : {
+      "id" : null,
+      "word" : "variable",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "attribute" : {
+      "id" : null,
+      "word" : "attribute",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outlet" : {
+      "id" : null,
+      "word" : "outlet",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "mechanism" : {
+      "id" : null,
+      "word" : "mechanism",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "operation" : {
+      "id" : null,
+      "word" : "operation",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outlook" : {
+      "id" : null,
+      "word" : "outlook",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    },
+    "outcome" : {
+      "id" : null,
+      "word" : "outcome",
+      "streak" : 0,
+      "reviewCount" : 0,
+      "nextReviewTime" : 0,
+      "status" : "queue",
+      "lastReview" : 0
+    }
+  }
 }

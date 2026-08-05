@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+
+
+
+
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '你的安全密钥(Secret)', // 🛠️ 在这里填入你申请到的【安全密钥】
+        }
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=d80f45a3adbb2ea8b6a61a6a98161897"></script>
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏛️ 烟火重燃 · 全球香肠微观数字艺术馆</title>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=dc2d71a7cff25a3348bd13bb8233e369"></script>
+    <script src="https://unpkg.com/@antv/l7"></script>
+
+    <style>
+        :root {
+            --gold: #dfb76c;
+            --meat-red: #9e2a2b;
+            --glow-red: #ff4d4d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Cinzel', 'STKaiti', serif; background: #050202; color: #fff; overflow: hidden; }
+        
+        #app { width: 100vw; height: 100vh; position: relative; }
+        #map-container { width: 100%; height: 100%; background: #050202; z-index: 1; }
+
+        /* 👑 顶部：数字策展宣言 */
+        .museum-header {
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            text-align: center; z-index: 10; pointer-events: none;
+        }
+        .museum-header h1 {
+            font-size: 32px; letter-spacing: 6px; color: var(--gold);
+            text-shadow: 0 0 20px rgba(223, 183, 108, 0.4); font-weight: 300;
+        }
+        .museum-header p { font-size: 12px; color: #665; text-transform: uppercase; margin-top: 5px; letter-spacing: 3px; }
+
+        /* 🖼️ 核心颠覆：浮空 3D 藏品交互舱（全屏居中或随点击浮现） */
+        .exhibit-capsule {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            width: 850px; background: rgba(10, 5, 5, 0.85);
+            border: 1px solid rgba(223,183,108,0.2); backdrop-filter: blur(25px);
+            border-radius: 16px; padding: 30px; z-index: 10;
+            display: flex; gap: 30px; box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 0 20px rgba(255,77,77,0.05);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* 🔬 左侧：微观粒子实验室（艺术动态化表达） */
+        .micro-lab-window {
+            width: 280px; height: 280px; background: #000; border-radius: 12px;
+            border: 1px solid rgba(158, 42, 43, 0.4); position: relative; overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(255,0,0,0.2);
+        }
+        /* 动态模拟：烟熏/油脂粒子流动效果 */
+        .particle-smoke {
+            position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 120%, rgba(158, 42, 43, 0.3) 0%, transparent 70%);
+            animation: smokeRise 4s infinite linear; filter: blur(8px);
+        }
+
+        /* 📝 右侧：硬核多维科学考据 */
+        .exhibit-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .info-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(223,183,108,0.15); padding-bottom: 10px; }
+        .info-title { font-size: 26px; color: var(--glow-red); font-weight: bold; }
+        .info-tag { font-size: 11px; border: 1px solid var(--gold); color: var(--gold); padding: 2px 8px; border-radius: 3px; text-transform: uppercase; }
+        
+        .info-lore { font-size: 14px; color: #ccc; line-height: 1.8; margin: 15px 0; font-style: italic; }
+        
+        /* 🧪 理化特征芯片 UI */
+        .chem-chips { display: flex; gap: 12px; }
+        .chip {
+            background: rgba(158, 42, 43, 0.1); border: 1px solid rgba(158, 42, 43, 0.3);
+            padding: 10px 15px; border-radius: 8px; flex: 1; text-align: center;
+        }
+        .chip-val { font-size: 18px; color: var(--gold); font-weight: bold; margin-bottom: 3px; font-family: monospace; }
+        .chip-label { font-size: 11px; color: #887; }
+
+        /* 🕹️ 底部触控式互动按钮 */
+        .nav-triggers {
+            position: absolute; left: 40px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 15px; z-index: 10;
+        }
+        .trigger-btn {
+            width: 50px; height: 50px; border-radius: 50%; background: #140d0d;
+            border: 1px solid rgba(223,183,108,0.3); color: #887; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s;
+            font-size: 12px; font-weight: bold;
+        }
+        .trigger-btn.active {
+            background: var(--meat-red); border-color: var(--glow-red); color: #fff;
+            box-shadow: 0 0 20px var(--glow-red); transform: scale(1.1);
+        }
+
+        @keyframes smokeRise {
+            0% { transform: translateY(20px) scale(0.9); opacity: 0; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="museum-header">
+        <h1>THE SAUSAGE ARTIFACTS</h1>
+        <p>全球香肠理化风土与微观数字艺术馆</p>
+    </div>
+
+    <div class="nav-triggers">
+        <div v-for="(item, idx) in artifacts" :key="item.id"
+             :class="['trigger-btn', activeIndex === idx ? 'active' : '']"
+             @click="selectArtifact(idx)">
+            0{{ idx + 1 }}
+        </div>
+    </div>
+
+    <div id="map-container"></div>
+
+    <div class="exhibit-capsule" v-if="currentArtifact">
+        <div class="micro-lab-window">
+            <div class="particle-smoke"></div>
+            <div :style="microWindowStyle" style="position: absolute; width: 100%; height: 100%; transition: all 1s;"></div>
+            <img :src="currentArtifact.image" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.4; mix-blend-mode: luminosity;" />
+            <div style="position: absolute; bottom: 10px; left: 10px; font-size: 10px; color: var(--gold); font-family: monospace; letter-spacing: 1px;">⚙️ MICRO-ENVIRONMENT ACTIVE</div>
+        </div>
+
+        <div class="exhibit-info">
+            <div class="info-header">
+                <div>
+                    <div class="info-title">{{ currentArtifact.name }}</div>
+                    <div style="font-size: 12px; color: #776; margin-top: 3px;">ORIGIN: {{ currentArtifact.origin }}</div>
+                </div>
+                <div class="info-tag">{{ currentArtifact.processType }}</div>
+            </div>
+
+            <div class="info-lore">
+                “ {{ currentArtifact.scienceLore }} ”
+            </div>
+
+            <div class="chem-chips">
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.metrics.ph }}</div>
+                    <div class="chip-label">熟成酸度 (pH)</div>
+                </div>
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.metrics.aw }}</div>
+                    <div class="chip-label">水分活度 (Aw)</div>
+                </div>
+                <div class="chip">
+                    <div class="chip-val">{{ currentArtifact.metrics.phenols }} ppm</div>
+                    <div class="chip-label">酚类聚积度</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const activeIndex = ref(0);
+            let scene = null;
+            let pointLayer = null;
+
+            // 🏺 殿堂级核心藏品理化数据库
+            const artifacts = ref([
+                { id: 3001, name: "四川柏丫烟熏肠", origin: "中国 · 四川盆地", lng: 104.066, lat: 30.572, processType: "低温重木熏制", image: "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=500", glowColor: "rgba(158, 42, 43, 0.5)", scienceLore: "在相对湿度 75% 的密闭火塘中，柏树丫半炭化释放的愈创木酚与肉类表面的游离氨基酸结合。历经 21 天，烟熏组分渗透皮下 3 毫米，锁死水分，形成了抗氧化的天然酚类保护层。", metrics: { ph: "5.2", aw: "0.82", phenols: "45" } },
+                { id: 3002, name: "意大利经典萨拉米", origin: "欧洲 · 摩德纳窖藏", lng: 10.925, lat: 44.647, processType: "微生物真菌固态发酵", image: "https://images.unsplash.com/photo-1629115911442-70b99ffec35b?w=500", glowColor: "rgba(210, 180, 140, 0.3)", scienceLore: "不经热处理的纯粹时间艺术。接种的葡萄球菌和乳酸菌在长达 90 天的窖藏中疯狂工作，将大分子蛋白质彻底降解为丰富的谷氨酸（Umami 鲜味核心），地窖内特定的相对湿度让肠衣表面裹上一层完美的白霉菌防线。", metrics: { ph: "4.8", aw: "0.78", phenols: "2" } },
+                { id: 3003, name: "广式高粱酒风干肠", origin: "中国 · 岭南平原", lng: 113.264, lat: 23.129, processType: "低氧自然控水烘脱", image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=500", glowColor: "rgba(235, 94, 40, 0.4)", scienceLore: "秋季干燥的北风（相对湿度降至 50% 以下）是天然的脱水泵。高浓度的蔗糖不仅是风味剂，更充当了渗透压调节剂，与 50 度大曲酒协同作用，在抑制有害菌繁殖的同时，引发了肉质内部剧烈的美拉德红润褐变。", metrics: { ph: "5.6", aw: "0.85", phenols: "0" } }
+            ]);
+
+            const currentArtifact = computed(() => artifacts.value[activeIndex.value]);
+
+            // 动态调节微观视窗色调
+            const microWindowStyle = computed(() => {
+                return {
+                    background: `radial-gradient(circle at center, ${currentArtifact.value.glowColor} 0%, transparent 80%)`,
+                    mixBlendMode: 'screen'
+                };
+            });
+
+            // 芯片级 AudioContext 音效控制（科技感滴答声）
+            const playTechSound = () => {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime); // 高频电子音
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            };
+
+            const initEpicMap = () => {
+                scene = new L7.Scene({
+                    id: 'map-container',
+                    map: new L7.GaodeMap({
+                        style: 'amap://styles/darkhide', // 使用极致纯黑无边框高德沙盘
+                        center: [105, 35], zoom: 3.5, token: 'YOUR_AMAP_KEY'
+                    })
+                });
+
+                scene.on('loaded', () => {
+                    pointLayer = new L7.PointLayer({})
+                        .source(artifacts.value, { parser: { type: 'json', x: 'lng', y: 'lat' } })
+                        .shape('circle')
+                        .size(20)
+                        .color('rgba(255,77,77,0.3)') // 科技感呼吸环
+                        .style({
+                            opacity: 1,
+                            stroke: '#dfb76c',
+                            strokeWidth: 1.5,
+                            glow: { color: '#ff4d4d', radius: 15 } // 开启高德 L7 级高级发光特效
+                        });
+
+                    pointLayer.on('click', ext => {
+                        const clickedId = ext.feature.id;
+                        const idx = artifacts.value.findIndex(a => a.id === clickedId);
+                        if (idx !== -1) selectArtifact(idx);
+                    });
+
+                    scene.addLayer(pointLayer);
+                    flyToTarget();
+                });
+            };
+
+            const selectArtifact = (index) => {
+                if (activeIndex.value === index) return;
+                activeIndex.value = index;
+                playTechSound();
+                flyToTarget();
+            };
+
+            const flyToTarget = () => {
+                const target = currentArtifact.value;
+                scene.setCenter([target.lng, target.lat], { duration: 1500 });
+                scene.setZoom(target.id === 3002 ? 4.5 : 5.5); // 飞越地球
+            };
+
+            onMounted(() => {
+                initEpicMap();
+            });
+
+            return { artifacts, activeIndex, currentArtifact, microWindowStyle, selectArtifact };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
